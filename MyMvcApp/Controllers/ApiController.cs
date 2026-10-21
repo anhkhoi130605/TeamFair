@@ -50,6 +50,36 @@ public class ApiController : ControllerBase
         }
     }
 
+    [HttpPost("clear-all")]
+    public async Task<IActionResult> ClearAllData()
+    {
+        try
+        {
+            _db.PeerReviews.RemoveRange(await _db.PeerReviews.ToListAsync());
+            _db.EmailLogs.RemoveRange(await _db.EmailLogs.ToListAsync());
+            _db.ActivityLogs.RemoveRange(await _db.ActivityLogs.ToListAsync());
+            _db.Tasks.RemoveRange(await _db.Tasks.ToListAsync());
+            _db.Meetings.RemoveRange(await _db.Meetings.ToListAsync());
+            _db.Members.RemoveRange(await _db.Members.Include(m => m.ScheduleSlots).ToListAsync());
+
+            var team = await _db.Teams.FirstOrDefaultAsync();
+            if (team != null)
+            {
+                team.Name = "Nhóm của tôi";
+                team.Topic = "";
+                team.Subject = "";
+                team.ClassCode = "";
+                team.FinalDeadline = "";
+            }
+            await _db.SaveChangesAsync();
+            return Ok(new { success = true, message = "Đã dọn sạch toàn bộ mock data trên Azure SQL Database!" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
+    }
+
     [HttpGet("state")]
     public async Task<IActionResult> GetState()
     {

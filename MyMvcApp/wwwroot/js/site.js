@@ -7,9 +7,9 @@
 const DEFAULT_STATE = {
   team: {
     name: "Nhóm của tôi",
-    topic: "Chưa đặt tên đề tài",
-    subject: "Chưa nhập môn học",
-    classCode: "Chưa nhập lớp",
+    topic: "",
+    subject: "",
+    classCode: "",
     finalDeadline: ""
   },
   members: [],
@@ -24,7 +24,7 @@ const DEFAULT_STATE = {
 const DEFAULT_LEADER = {
   id: "leader_root",
   name: "Trưởng Nhóm",
-  email: "truongnhom@student.edu.vn",
+  email: "",
   role: "Trưởng nhóm",
   roleType: "Leader",
   avatar: "TN",
@@ -175,15 +175,21 @@ const TeamFairApp = {
     }
   },
 
-  clearAllData() {
+  async clearAllData() {
     if (confirm("Bạn có chắc chắn muốn xóa toàn bộ dữ liệu (thành viên, công việc, lịch họp...) để nhập lại từ đầu?")) {
+      try {
+        await fetch("/api/clear-all", { method: "POST" });
+      } catch (e) {
+        console.warn("Lỗi gọi clear-all API:", e);
+      }
+      localStorage.removeItem("TeamFair_State_v3");
+      localStorage.removeItem("TeamFair_CurrentUser_v1");
       this.state = JSON.parse(JSON.stringify(DEFAULT_STATE));
       this.currentUser = { ...DEFAULT_LEADER };
       this.saveUserSession();
       this.currentSchedulerMemberId = "";
-      this.saveState();
       this.renderAll();
-      this.showToast("Đã xóa toàn bộ dữ liệu, sẵn sàng nhập mới!", "info");
+      this.showToast("Đã xóa toàn bộ dữ liệu sạch sẽ, sẵn sàng nhập mới!", "info");
     }
   },
 
