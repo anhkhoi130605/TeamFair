@@ -1,0 +1,705 @@
+@{
+    ViewData["Title"] = "TeamFair - Đo đóng góp & Quản trị nhóm tự động";
+}
+
+<div class="container-fluid px-3 px-lg-4 py-3">
+    <!-- Top Bar / App Brand -->
+    <header class="d-flex flex-wrap align-items-center justify-content-between p-3 mb-3 bg-white rounded-4 shadow-sm border">
+        <div class="d-flex align-items-center gap-3">
+            <div style="font-size: 2.2rem; line-height: 1;" title="TeamFair Logo">🤝</div>
+            <div>
+                <div class="d-flex align-items-center gap-2">
+                    <h4 class="fw-bold text-slate-900 mb-0" style="letter-spacing: -0.5px;">TeamFair</h4>
+                    <span class="badge bg-primary-subtle text-primary fw-bold px-2 py-1" style="font-size: 0.75rem;">Nền tảng Quản Trị Nhóm</span>
+                </div>
+                <div class="text-muted small mt-1" style="font-size: 0.825rem;">
+                    Đo đóng góp nhóm tự động — số lượng lẫn chất lượng, không ai phải chấm điểm ai
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 flex-wrap mt-2 mt-md-0">
+            <div class="px-3 py-1 bg-light rounded-3 border d-flex align-items-center gap-2">
+                <span class="small text-muted">Nhóm:</span>
+                <strong class="text-slate-900 small" id="topTeamName">Nhóm của tôi</strong>
+                <button class="btn btn-sm btn-link p-0 text-decoration-none" onclick="TeamFairApp.editTeamInfo()" title="Chỉnh sửa thông tin nhóm">✏️</button>
+            </div>
+
+            <span id="dbStatusBadge" class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" style="font-size: 0.75rem;">
+                🟢 Azure SQL: Đang kết nối...
+            </span>
+
+            <button class="btn btn-sm btn-outline-danger" onclick="TeamFairApp.clearAllData()" title="Xóa toàn bộ dữ liệu để nhập lại từ đầu">
+                🗑️ Xóa làm mới
+            </button>
+            <button class="btn btn-sm btn-tf-primary text-white" onclick="TeamFairApp.switchTab('report')">
+                📄 Báo cáo nộp bài
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Navigation Tabs -->
+    <nav class="tf-nav-tabs mb-4">
+        <button class="tf-tab-btn active" data-tab="dashboard">
+            <span>📊</span>
+            <span>Dashboard Tổng Quan</span>
+        </button>
+        <button class="tf-tab-btn" data-tab="tasks">
+            <span>📋</span>
+            <span>Phân Chia Công Việc</span>
+            <span class="badge bg-primary" id="badge-task-count">0/0</span>
+        </button>
+        <button class="tf-tab-btn" data-tab="schedule">
+            <span>🗓️</span>
+            <span>Lịch Rảnh Nhóm</span>
+        </button>
+        <button class="tf-tab-btn" data-tab="meeting">
+            <span>📹</span>
+            <span>Phòng Họp Ảo</span>
+        </button>
+        <button class="tf-tab-btn" data-tab="reviews">
+            <span>⭐</span>
+            <span>Đánh Giá Chéo</span>
+        </button>
+        <button class="tf-tab-btn" data-tab="emails">
+            <span>✉️</span>
+            <span>Thông Báo & Email</span>
+            <span class="badge bg-danger" id="badge-email-count">0</span>
+        </button>
+        <button class="tf-tab-btn" data-tab="report">
+            <span>📑</span>
+            <span>Báo Cáo Nộp Bài</span>
+        </button>
+    </nav>
+
+    <!-- TAB 1: DASHBOARD TỔNG QUAN -->
+    <div class="tf-tab-pane" id="pane-dashboard">
+        <!-- 4 KPI Summary Cards -->
+        <div class="row g-3 mb-4">
+            <div class="col-sm-6 col-xl-3">
+                <div class="tf-card p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="text-muted small fw-semibold text-uppercase">Tiến độ chung đồ án</div>
+                            <h2 class="fw-bold text-slate-900 mt-2 mb-1" id="dash-kpi-progress">0%</h2>
+                            <span class="small text-muted" id="dash-kpi-tasks">0 / 0 việc hoàn thành</span>
+                        </div>
+                        <div class="p-2 rounded-3 bg-primary-subtle text-primary fs-4">📈</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-sm-6 col-xl-3">
+                <div class="tf-card p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="text-muted small fw-semibold text-uppercase">Chỉ số công bằng</div>
+                            <h2 class="fw-bold text-success mt-2 mb-1" id="dash-kpi-fairness">--</h2>
+                            <span class="small text-muted" id="dash-kpi-fairness-label">Chờ thêm việc & thành viên</span>
+                        </div>
+                        <div class="p-2 rounded-3 bg-success-subtle text-success fs-4">⚖️</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-sm-6 col-xl-3">
+                <div class="tf-card p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="text-muted small fw-semibold text-uppercase">Cuộc họp nhóm kế tiếp</div>
+                            <h2 class="fw-bold text-slate-900 mt-2 mb-1" id="dash-kpi-meeting" style="font-size: 1.25rem;">Chưa có</h2>
+                            <button class="btn btn-link p-0 text-primary small text-decoration-none fw-semibold" onclick="TeamFairApp.switchTab('meeting')">
+                                ➔ Đặt lịch phòng họp
+                            </button>
+                        </div>
+                        <div class="p-2 rounded-3 bg-warning-subtle text-warning fs-4">📹</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-sm-6 col-xl-3">
+                <div class="tf-card p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="text-muted small fw-semibold text-uppercase">Nhắc nhở qua email</div>
+                            <h2 class="fw-bold text-primary mt-2 mb-1">Tự Động</h2>
+                            <button class="btn btn-link p-0 text-danger small text-decoration-none fw-semibold" onclick="TeamFairApp.sendAllPendingReminders()">
+                                ✉️ Gửi email nhắc nhở ngay
+                            </button>
+                        </div>
+                        <div class="p-2 rounded-3 bg-danger-subtle text-danger fs-4">🔔</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Realtime Contribution Section (User's Step 3) -->
+        <div class="row g-4 mb-4">
+            <div class="col-lg-8">
+                <div class="tf-card h-100">
+                    <div class="tf-card-header d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <span class="tf-step-num">3</span>
+                            <div>
+                                <h5 class="fw-bold text-slate-900 mb-0">Mức đóng góp theo thời gian thực</h5>
+                                <div class="text-muted small">(khối lượng × độ khó × chất lượng)</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tf-card-body" id="dash-chart-container">
+                        <!-- Rendered by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="tf-card h-100">
+                    <div class="tf-card-header">
+                        <h6 class="fw-bold text-slate-900 mb-0">🕒 Dòng sự kiện gần đây</h6>
+                    </div>
+                    <div class="tf-card-body p-3" id="dash-activity-feed" style="max-height: 380px; overflow-y: auto;">
+                        <!-- Rendered by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Deadlines & Quick Email Reminders -->
+        <div class="tf-card mb-4">
+            <div class="tf-card-header d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold text-slate-900 mb-0">⏰ Các công việc cần theo dõi tiến độ & nhắc nhở</h6>
+                <button class="btn btn-sm btn-outline-danger" onclick="TeamFairApp.sendAllPendingReminders()">
+                    ✉️ Nhắc nhở hạn chót tất cả
+                </button>
+            </div>
+            <div class="tf-card-body p-0" id="dash-urgent-deadlines">
+                <!-- Rendered by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: PHÂN CHIA CÔNG VIỆC -->
+    <div class="tf-tab-pane d-none" id="pane-tasks">
+        <div class="row g-4">
+            <!-- Left Column: Add Member & Add Task Forms (User's original Step 1 & 2) -->
+            <div class="col-lg-5">
+                <!-- Step 1: Thành viên nhóm -->
+                <div class="tf-card mb-4">
+                    <div class="tf-card-header">
+                        <div class="d-flex align-items-center">
+                            <span class="tf-step-num">1</span>
+                            <h5 class="fw-bold text-slate-900 mb-0">Thành viên nhóm</h5>
+                        </div>
+                    </div>
+                    <div class="tf-card-body">
+                        <form id="formAddMember" class="mb-3">
+                            <div class="input-group mb-2">
+                                <input type="text" id="memberName" class="form-control" placeholder="Tên thành viên..." required />
+                                <button type="submit" class="btn btn-primary px-3 fw-semibold">Thêm</button>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-sm-7">
+                                    <input type="email" id="memberEmail" class="form-control form-control-sm" placeholder="Email nhận thông báo..." />
+                                </div>
+                                <div class="col-sm-5">
+                                    <input type="text" id="memberRole" class="form-control form-control-sm" placeholder="Vai trò (VD: Frontend)" />
+                                </div>
+                            </div>
+                        </form>
+                        <div id="membersListContainer">
+                            <!-- Rendered by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2: Đầu việc của nhóm (Form giao việc) -->
+                <div class="tf-card">
+                    <div class="tf-card-header">
+                        <div class="d-flex align-items-center">
+                            <span class="tf-step-num">2</span>
+                            <h5 class="fw-bold text-slate-900 mb-0">Đầu việc của nhóm</h5>
+                        </div>
+                    </div>
+                    <div class="tf-card-body">
+                        <form id="formAddTask">
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold text-slate-700">Tên công việc *</label>
+                                <input type="text" id="taskTitle" class="form-control" placeholder="Tên công việc..." required />
+                            </div>
+
+                            <div class="row g-2 mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold text-slate-700">Giao cho...</label>
+                                    <select id="taskAssignee" class="form-select" required>
+                                        <!-- Rendered by JS -->
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold text-slate-700">Độ khó: *</label>
+                                    <select id="taskDifficulty" class="form-select">
+                                        <option value="easy">Dễ</option>
+                                        <option value="medium" selected>Trung bình</option>
+                                        <option value="hard">Khó</option>
+                                        <option value="vhard">Rất khó</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="row g-2 mb-3">
+                                <div class="col-sm-6">
+                                    <label class="form-label small fw-semibold text-slate-700">Hạn chót (Deadline)</label>
+                                    <input type="date" id="taskDeadline" class="form-control" />
+                                </div>
+                                <div class="col-sm-6">
+                                    <label class="form-label small fw-semibold text-slate-700">Ước lượng (Giờ chuẩn)</label>
+                                    <input type="number" id="taskHours" class="form-control" value="8" min="1" max="100" />
+                                </div>
+                            </div>
+
+                            <div class="row g-2 mb-3">
+                                <div class="col-12">
+                                    <label class="form-label small fw-semibold text-slate-700">Chuyên mục / Module</label>
+                                    <input type="text" id="taskCategory" class="form-control" placeholder="Frontend, Backend, Slide, Báo cáo..." />
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold text-slate-700">Mô tả & Tiêu chí nghiệm thu</label>
+                                <textarea id="taskDesc" class="form-control" rows="2" placeholder="Chi tiết yêu cầu cần bàn giao..."></textarea>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary w-100 fw-bold py-2">
+                                Giao việc
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Task List & Filter -->
+            <div class="col-lg-7">
+                <div class="tf-card h-100">
+                    <div class="tf-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <h5 class="fw-bold text-slate-900 mb-0">📋 Danh sách công việc phân chia</h5>
+                        <div class="d-flex gap-2">
+                            <select id="filterTaskMember" class="form-select form-select-sm" onchange="TeamFairApp.renderTaskList()">
+                                <option value="all">Tất cả thành viên</option>
+                            </select>
+                            <select id="filterTaskStatus" class="form-select form-select-sm" onchange="TeamFairApp.renderTaskList()">
+                                <option value="all">Tất cả trạng thái</option>
+                                <option value="todo">Chưa bắt đầu</option>
+                                <option value="doing">Đang làm</option>
+                                <option value="review">Chờ đánh giá</option>
+                                <option value="done">Đã hoàn thành</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="tf-card-body p-3" id="taskListContainer">
+                        <!-- Rendered by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 3: LỊCH RẢNH NHÓM (AVAILABILITY HEATMAP) -->
+    <div class="tf-tab-pane d-none" id="pane-schedule">
+        <div class="tf-card mb-4">
+            <div class="tf-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div>
+                    <h5 class="fw-bold text-slate-900 mb-0">🗓️ Ma Trận Lịch Rảnh & Tìm Giờ Họp Chung</h5>
+                    <div class="text-muted small">Mỗi thành viên chọn tên mình và click vào các ô để cập nhật lịch rảnh cá nhân. Hệ thống tự động tìm khung giờ vàng cả nhóm cùng rảnh.</div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="small fw-semibold text-slate-700">Đang chọn bạn:</span>
+                    <select id="schedulerMemberSelect" class="form-select form-select-sm" style="min-width: 200px;">
+                        <!-- Rendered by JS -->
+                    </select>
+                </div>
+            </div>
+
+            <div class="tf-card-body">
+                <!-- Golden Hours Recommendation Box -->
+                <div class="mb-3" id="scheduleGoldenRecommendation">
+                    <!-- Rendered by JS -->
+                </div>
+
+                <!-- Schedule Table Container -->
+                <div id="scheduleTableContainer">
+                    <!-- Rendered by JS -->
+                </div>
+
+                <div class="d-flex flex-wrap gap-4 mt-3 pt-3 border-top justify-content-center text-muted small">
+                    <div class="d-flex align-items-center gap-2">
+                        <span style="display:inline-block; width:16px; height:16px; background:#bbf7d0; border:2px solid #22c55e; border-radius:4px;"></span>
+                        <span>100% thành viên rảnh (Khung giờ vàng)</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span style="display:inline-block; width:16px; height:16px; background:#dcfce7; border:1px solid #86efac; border-radius:4px;"></span>
+                        <span>>= 75% thành viên rảnh</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span style="display:inline-block; width:16px; height:16px; background:#fef9c3; border:1px solid #fde047; border-radius:4px;"></span>
+                        <span>50% thành viên rảnh</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span style="display:inline-block; width:16px; height:16px; background:#fee2e2; border:1px solid #fca5a5; border-radius:4px;"></span>
+                        <span>&lt; 50% thành viên rảnh</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 4: PHÒNG HỌP ẢO (MEETING ROOM) -->
+    <div class="tf-tab-pane d-none" id="pane-meeting">
+        <div class="row g-4">
+            <!-- Schedule Meeting Form -->
+            <div class="col-lg-4">
+                <div class="tf-card mb-4">
+                    <div class="tf-card-header">
+                        <h5 class="fw-bold text-slate-900 mb-0">📅 Lên Lịch Phòng Họp Mới</h5>
+                    </div>
+                    <div class="tf-card-body">
+                        <form id="formAddMeeting">
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold text-slate-700">Tiêu đề cuộc họp *</label>
+                                <input type="text" id="meetingTitle" class="form-control" placeholder="VD: Họp rà soát tiến độ..." required />
+                            </div>
+
+                            <div class="row g-2 mb-3">
+                                <div class="col-sm-6">
+                                    <label class="form-label small fw-semibold text-slate-700">Ngày họp *</label>
+                                    <input type="date" id="meetingDate" class="form-control" required />
+                                </div>
+                                <div class="col-sm-6">
+                                    <label class="form-label small fw-semibold text-slate-700">Giờ họp *</label>
+                                    <input type="time" id="meetingTime" class="form-control" value="19:30" required />
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold text-slate-700">Thời lượng dự kiến (phút)</label>
+                                <input type="number" id="meetingDuration" class="form-control" value="60" min="15" max="300" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold text-slate-700">Nội dung họp & Biên bản thảo luận</label>
+                                <textarea id="meetingNotes" class="form-control" rows="3" placeholder="Ghi chú nội dung cần bàn bạc..."></textarea>
+                            </div>
+
+                            <button type="submit" class="btn btn-tf-primary w-100 fw-bold py-2 text-white">
+                                📅 Tạo phòng họp & Gửi email mời nhóm
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- List of Meetings & Instant Entry -->
+            <div class="col-lg-8">
+                <div class="tf-card">
+                    <div class="tf-card-header d-flex justify-content-between align-items-center">
+                        <h5 class="fw-bold text-slate-900 mb-0">📹 Danh sách phòng họp & Lịch họp nhóm</h5>
+                        <button class="btn btn-sm btn-success text-white" onclick="TeamFairApp.enterVirtualMeeting('')">
+                            ▶️ Mở phòng họp ảo tức thì
+                        </button>
+                    </div>
+                    <div class="tf-card-body p-3" id="meetingsListContainer">
+                        <!-- Rendered by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 5: ĐÁNH GIÁ CÔNG VIỆC CHÉO (PEER REVIEW) -->
+    <div class="tf-tab-pane d-none" id="pane-reviews">
+        <div class="tf-card mb-4">
+            <div class="tf-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div>
+                    <h5 class="fw-bold text-slate-900 mb-0">⭐ Đánh Giá Công Việc Chéo (Peer Review)</h5>
+                    <div class="text-muted small">
+                        Đánh giá công tâm dựa trên 4 tiêu chí: Chất lượng, Đúng hạn, Độ khó nỗ lực & Tinh thần hợp tác.
+                    </div>
+                </div>
+                <button class="btn btn-sm btn-tf-indigo text-white" onclick="TeamFairApp.switchTab('tasks')">
+                    ➕ Chọn đầu việc để đánh giá
+                </button>
+            </div>
+            <div class="tf-card-body">
+                <div class="p-3 bg-light rounded-3 mb-3 border">
+                    <div class="fw-bold text-slate-800 small mb-1">💡 Cơ chế tính điểm chất lượng tự động:</div>
+                    <div class="small text-slate-600">
+                        Điểm đánh giá chéo trung bình (1 - 5 sao) sẽ sinh ra hệ số chất lượng từ <strong>0.6x (kém)</strong> đến <strong>1.3x (xuất sắc)</strong>.
+                        Hệ số này tự động nhân vào khối lượng công việc, đảm bảo bạn làm nhiều nhưng cẩu thả sẽ không được điểm cao bằng người làm chỉn chu, đúng hạn!
+                    </div>
+                </div>
+
+                <div id="reviewsListContainer">
+                    <!-- Rendered by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 6: THÔNG BÁO & EMAIL (EMAIL HUB) -->
+    <div class="tf-tab-pane d-none" id="pane-emails">
+        <div class="tf-card mb-4">
+            <div class="tf-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div>
+                    <h5 class="fw-bold text-slate-900 mb-0">✉️ Hệ Thống Thông Báo & Nhắc Nhở Qua Email</h5>
+                    <div class="text-muted small">Hệ thống gửi email thông báo khi giao việc, nhắc nhở hạn chót, mời họp và báo cáo tiến độ.</div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-danger" onclick="TeamFairApp.sendAllPendingReminders()">
+                        ⏰ Gửi email nhắc nhở hạn chót tất cả
+                    </button>
+                </div>
+            </div>
+            <div class="tf-card-body">
+                <div class="alert alert-info py-2 small d-flex align-items-center gap-2">
+                    <span>💡</span>
+                    <span>Tất cả email gửi đi đều được lưu lịch sử đầy đủ. Bạn có thể bấm nút <strong>"Xem định dạng HTML chuẩn"</strong> để xem bức email thực tế được gửi đến hộp thư sinh viên!</span>
+                </div>
+
+                <div id="emailsListContainer">
+                    <!-- Rendered by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 7: BÁO CÁO NỘP KÈM BÀI (User's Step 4) -->
+    <div class="tf-tab-pane d-none" id="pane-report">
+        <div class="tf-card p-4 bg-white">
+            <div class="d-flex justify-content-between align-items-center mb-4 no-print border-bottom pb-3">
+                <div class="d-flex align-items-center">
+                    <span class="tf-step-num">4</span>
+                    <div>
+                        <h4 class="fw-bold text-slate-900 mb-0">Báo cáo nộp kèm bài</h4>
+                        <div class="text-muted small">Báo cáo phân chia công việc & mức độ đóng góp chính thức nộp kèm bài tập lớn/đồ án</div>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary fw-semibold" onclick="TeamFairApp.printReport()">
+                        🖨️ In / Xuất file PDF Báo Cáo
+                    </button>
+                </div>
+            </div>
+
+            <!-- Formal University Assignment Cover/Header -->
+            <div class="p-4 rounded-3 border bg-light mb-4">
+                <div class="text-center mb-3">
+                    <h5 class="fw-bold text-uppercase text-slate-800 mb-1">BẢNG TỔNG HỢP PHÂN CÔNG & ĐÁNH GIÁ ĐÓNG GÓP THÀNH VIÊN</h5>
+                    <div class="text-muted small fst-italic">Tự động xuất bởi hệ thống TeamFair — Đảm bảo khách quan, định lượng và minh bạch</div>
+                </div>
+                <div class="row g-2 small text-slate-700">
+                    <div class="col-md-6"><strong>Tên nhóm:</strong> <span id="repTeamName">Nhóm của tôi</span></div>
+                    <div class="col-md-6"><strong>Môn học:</strong> <span id="repSubject">Chưa nhập môn học</span></div>
+                    <div class="col-md-6"><strong>Đề tài:</strong> <span id="repTopic">Chưa đặt tên đề tài</span></div>
+                    <div class="col-md-6"><strong>Lớp & GVHD:</strong> <span id="repClass">Chưa nhập lớp</span></div>
+                </div>
+            </div>
+
+            <!-- Member Summary Table -->
+            <div class="table-responsive mb-4">
+                <table class="table table-bordered align-middle">
+                    <thead class="table-light">
+                        <tr class="text-center small">
+                            <th>STT</th>
+                            <th>Họ và Tên</th>
+                            <th>Nhiệm Vụ Đảm Nhận & Tiến Độ</th>
+                            <th>Đánh Giá Chéo</th>
+                            <th>Điểm Khối Lượng</th>
+                            <th>Tỷ Lệ Đóng Góp</th>
+                            <th>Điểm Đề Xuất</th>
+                            <th>Chữ Ký Điện Tử</th>
+                        </tr>
+                    </thead>
+                    <tbody id="repMembersTableBody">
+                        <!-- Rendered by JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Signatures Section -->
+            <div class="row text-center mt-5 pt-3">
+                <div class="col-4">
+                    <div class="fw-bold small text-muted text-uppercase mb-4">Giảng Viên Hướng Dẫn</div>
+                    <div class="fst-italic text-muted small">(Ký và ghi rõ họ tên)</div>
+                </div>
+                <div class="col-4">
+                    <div class="fw-bold small text-muted text-uppercase mb-4">Trưởng Nhóm</div>
+                    <div class="fst-italic text-muted small">(Xác nhận điện tử)</div>
+                </div>
+                <div class="col-4">
+                    <div class="fw-bold small text-muted text-uppercase mb-4">Ngày Xuất Báo Cáo</div>
+                    <div class="fw-semibold text-slate-800" id="repPrintDate">Hôm nay</div>
+                    <div class="fst-italic text-muted small">Hệ thống TeamFair</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer matching user's original design -->
+    <footer class="text-center text-muted small py-4 mt-3">
+        TeamFair — Prototype cho buổi demo trước lớp
+    </footer>
+</div>
+
+<!-- MODAL: PHÒNG HỌP ẢO (VIRTUAL MEETING ROOM) -->
+<div class="modal fade" id="virtualMeetingModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-fullscreen">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header border-secondary py-2 px-3">
+                <div class="d-flex align-items-center gap-3">
+                    <span class="fs-4">🤝</span>
+                    <div>
+                        <h6 class="modal-title fw-bold text-white mb-0" id="meetingModalTitle">Phòng Họp Nhóm TeamFair Trực Tuyến</h6>
+                        <span class="small text-success">● Đang trực tuyến • Thời lượng: <strong id="meetingTimerText">00:00</strong></span>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-sm btn-danger px-3 fw-bold" onclick="TeamFairApp.leaveMeeting()">Rời phòng họp</button>
+            </div>
+            <div class="modal-body p-3 d-flex flex-column" style="background: #0b0f19;">
+                <div class="row g-3 flex-grow-1">
+                    <!-- Video Grid -->
+                    <div class="col-lg-9 d-flex flex-column">
+                        <div class="tf-video-grid flex-grow-1" id="meetingVideoGrid">
+                            <!-- Rendered by JS -->
+                        </div>
+
+                        <!-- Meeting Controls Bar -->
+                        <div class="tf-meeting-ctrls mt-3">
+                            <button class="tf-meeting-btn" id="btnToggleMic" onclick="TeamFairApp.toggleMic()" title="Bật/Tắt Micro">🎙️</button>
+                            <button class="tf-meeting-btn" id="btnToggleCamera" onclick="TeamFairApp.toggleCamera()" title="Bật/Tắt Camera">📹</button>
+                            <button class="tf-meeting-btn" id="btnToggleScreen" onclick="TeamFairApp.toggleScreenShare()" title="Chia sẻ màn hình">🖥️</button>
+                            <button class="tf-meeting-btn btn-danger-room" onclick="TeamFairApp.leaveMeeting()" title="Kết thúc cuộc họp">📞</button>
+                        </div>
+                    </div>
+
+                    <!-- Side Chat & Live Minutes -->
+                    <div class="col-lg-3 d-flex flex-column">
+                        <div class="card bg-secondary bg-opacity-25 border-secondary text-white h-100 d-flex flex-column">
+                            <div class="card-header border-secondary py-2 small fw-bold">
+                                💬 Trò chuyện & Biên bản cuộc họp
+                            </div>
+                            <div class="card-body p-2 flex-grow-1 overflow-auto" id="meetingChatMessages" style="max-height: 400px;">
+                                <div class="mb-2 p-2 rounded bg-dark small">
+                                    <span class="text-info fw-bold">TeamFair Bot:</span> Phòng họp ảo đã mở.
+                                </div>
+                            </div>
+                            <div class="card-footer border-secondary p-2">
+                                <div class="input-group">
+                                    <input type="text" id="meetingChatInput" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Nhập tin nhắn..." onkeypress="if(event.key==='Enter') TeamFairApp.sendMeetingChat()" />
+                                    <button class="btn btn-sm btn-primary" onclick="TeamFairApp.sendMeetingChat()">Gửi</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: ĐÁNH GIÁ CHÉO (PEER REVIEW MODAL) -->
+<div class="modal fade" id="peerReviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold text-slate-900">⭐ Đánh Giá Chéo Công Việc Đồng Đội</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="reviewTaskId" />
+
+                <div class="p-3 bg-light rounded-3 mb-3 border">
+                    <div class="small text-muted">Công việc đánh giá:</div>
+                    <div class="fw-bold text-slate-900" id="reviewTaskTitleDisplay">Tên công việc</div>
+                    <div class="small text-muted mt-1">Người thực hiện: <strong class="text-primary" id="revieweeNameDisplay">Tên</strong></div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold text-slate-700">Bạn là ai (Người đánh giá):</label>
+                    <select id="reviewerSelect" class="form-select form-select-sm">
+                        <!-- Populated by JS -->
+                    </select>
+                </div>
+
+                <!-- 4 Criteria Ratings -->
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold text-slate-700 d-block">1. Chất lượng sản phẩm & đúng yêu cầu (1-5 ⭐):</label>
+                    <div class="star-rating">
+                        <input type="radio" id="q5" name="rateQuality" value="5" checked><label for="q5">★</label>
+                        <input type="radio" id="q4" name="rateQuality" value="4"><label for="q4">★</label>
+                        <input type="radio" id="q3" name="rateQuality" value="3"><label for="q3">★</label>
+                        <input type="radio" id="q2" name="rateQuality" value="2"><label for="q2">★</label>
+                        <input type="radio" id="q1" name="rateQuality" value="1"><label for="q1">★</label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold text-slate-700 d-block">2. Đúng tiến độ / Deadline (1-5 ⭐):</label>
+                    <div class="star-rating">
+                        <input type="radio" id="p5" name="ratePunctuality" value="5" checked><label for="p5">★</label>
+                        <input type="radio" id="p4" name="ratePunctuality" value="4"><label for="p4">★</label>
+                        <input type="radio" id="p3" name="ratePunctuality" value="3"><label for="p3">★</label>
+                        <input type="radio" id="p2" name="ratePunctuality" value="2"><label for="p2">★</label>
+                        <input type="radio" id="p1" name="ratePunctuality" value="1"><label for="p1">★</label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold text-slate-700 d-block">3. Độ khó & Nỗ lực bỏ ra (1-5 ⭐):</label>
+                    <div class="star-rating">
+                        <input type="radio" id="e5" name="rateEffort" value="5" checked><label for="e5">★</label>
+                        <input type="radio" id="e4" name="rateEffort" value="4"><label for="e4">★</label>
+                        <input type="radio" id="e3" name="rateEffort" value="3"><label for="e3">★</label>
+                        <input type="radio" id="e2" name="rateEffort" value="2"><label for="e2">★</label>
+                        <input type="radio" id="e1" name="rateEffort" value="1"><label for="e1">★</label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold text-slate-700 d-block">4. Tinh thần hợp tác & phản hồi (1-5 ⭐):</label>
+                    <div class="star-rating">
+                        <input type="radio" id="c5" name="rateCooperation" value="5" checked><label for="c5">★</label>
+                        <input type="radio" id="c4" name="rateCooperation" value="4"><label for="c4">★</label>
+                        <input type="radio" id="c3" name="rateCooperation" value="3"><label for="c3">★</label>
+                        <input type="radio" id="c2" name="rateCooperation" value="2"><label for="c2">★</label>
+                        <input type="radio" id="c1" name="rateCooperation" value="1"><label for="c1">★</label>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold text-slate-700">Lời góp ý mang tính xây dựng:</label>
+                    <textarea id="reviewComment" class="form-control" rows="2" placeholder="Nhận xét cụ thể điểm làm tốt và điểm cần cải thiện..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-tf-primary text-white" onclick="TeamFairApp.submitPeerReview()">Gửi Đánh Giá</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: XEM TRƯỚC EMAIL (EMAIL PREVIEW MODAL) -->
+<div class="modal fade" id="emailPreviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold text-slate-900">✉️ Xem Trước Định Dạng Email Gửi Đến Hộp Thư</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4" id="emailPreviewModalBody">
+                <!-- Rendered by JS -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,416 @@
+/* TeamFair Modern Design System */
+:root {
+  --tf-primary: #059669;
+  --tf-primary-hover: #047857;
+  --tf-primary-light: #ecfdf5;
+  --tf-indigo: #4f46e5;
+  --tf-indigo-light: #eef2ff;
+  --tf-sky: #0284c7;
+  --tf-sky-light: #f0f9ff;
+  --tf-amber: #d97706;
+  --tf-amber-light: #fffbeb;
+  --tf-rose: #e11d48;
+  --tf-rose-light: #fff1f2;
+  --tf-slate-50: #f8fafc;
+  --tf-slate-100: #f1f5f9;
+  --tf-slate-200: #e2e8f0;
+  --tf-slate-300: #cbd5e1;
+  --tf-slate-400: #94a3b8;
+  --tf-slate-600: #475569;
+  --tf-slate-700: #334155;
+  --tf-slate-800: #1e293b;
+  --tf-slate-900: #0f172a;
+  --tf-card-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+  --tf-card-hover: 0 12px 30px -4px rgba(15, 23, 42, 0.1), 0 4px 8px -2px rgba(15, 23, 42, 0.06);
+  --tf-radius: 14px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: #f6f8fb;
+  color: var(--tf-slate-800);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Utilities */
+.bg-slate-50 { background-color: var(--tf-slate-50); }
+.bg-slate-100 { background-color: var(--tf-slate-100); }
+.bg-slate-800 { background-color: var(--tf-slate-800); }
+.text-slate-500 { color: var(--tf-slate-400); }
+.text-slate-600 { color: var(--tf-slate-600); }
+.text-slate-700 { color: var(--tf-slate-700); }
+.text-slate-800 { color: var(--tf-slate-800); }
+.text-slate-900 { color: var(--tf-slate-900); }
+.text-primary-tf { color: var(--tf-primary); }
+
+/* Glass & Card Styles */
+.tf-card {
+  background: #ffffff;
+  border: 1px solid var(--tf-slate-200);
+  border-radius: var(--tf-radius);
+  box-shadow: var(--tf-card-shadow);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tf-card:hover {
+  box-shadow: var(--tf-card-hover);
+}
+
+.tf-card-header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--tf-slate-100);
+  background: transparent;
+}
+
+.tf-card-body {
+  padding: 1.25rem;
+}
+
+/* Step Badges matching user's original design */
+.tf-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: #1e40af;
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 700;
+  border-radius: 50%;
+  margin-right: 0.65rem;
+  box-shadow: 0 2px 4px rgba(30, 64, 175, 0.25);
+}
+
+/* Navigation Tabs Bar */
+.tf-nav-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: #ffffff;
+  border: 1px solid var(--tf-slate-200);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.tf-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.1rem;
+  font-size: 0.925rem;
+  font-weight: 600;
+  color: var(--tf-slate-600);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tf-tab-btn:hover {
+  color: var(--tf-slate-900);
+  background: var(--tf-slate-100);
+}
+
+.tf-tab-btn.active {
+  color: #ffffff;
+  background: linear-gradient(135deg, #059669 0%, #0d9488 100%);
+  box-shadow: 0 4px 10px rgba(5, 150, 105, 0.3);
+}
+
+.tf-tab-btn .badge {
+  font-size: 0.725rem;
+  border-radius: 9999px;
+  padding: 0.2rem 0.5rem;
+}
+
+/* Buttons */
+.btn-tf-primary {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: #ffffff;
+  border: none;
+  font-weight: 600;
+  padding: 0.55rem 1.25rem;
+  border-radius: 8px;
+  transition: all 0.2s;
+  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.25);
+}
+.btn-tf-primary:hover {
+  background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.35);
+  transform: translateY(-1px);
+}
+
+.btn-tf-indigo {
+  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+  color: #ffffff;
+  border: none;
+  font-weight: 600;
+  padding: 0.55rem 1.25rem;
+  border-radius: 8px;
+  transition: all 0.2s;
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
+}
+.btn-tf-indigo:hover {
+  background: linear-gradient(135deg, #4338ca 0%, #3730a3 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+  transform: translateY(-1px);
+}
+
+/* Avatar Chips */
+.tf-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Task Difficulty Badges */
+.badge-diff-easy {
+  background-color: #dcfce7;
+  color: #15803d;
+  font-weight: 600;
+}
+.badge-diff-medium {
+  background-color: #e0f2fe;
+  color: #0369a1;
+  font-weight: 600;
+}
+.badge-diff-hard {
+  background-color: #fef3c7;
+  color: #b45309;
+  font-weight: 600;
+}
+.badge-diff-vhard {
+  background-color: #fee2e2;
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+/* Status Badges */
+.badge-status-todo {
+  background-color: #f1f5f9;
+  color: #475569;
+}
+.badge-status-doing {
+  background-color: #e0e7ff;
+  color: #3730a3;
+}
+.badge-status-review {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+.badge-status-done {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+/* Progress bar styled */
+.tf-progress {
+  height: 8px;
+  background-color: var(--tf-slate-200);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.tf-progress-bar {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #059669 0%, #10b981 100%);
+  transition: width 0.4s ease;
+}
+
+/* Weekly Availability Grid (Lịch rảnh) */
+.tf-schedule-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 4px;
+}
+.tf-schedule-table th {
+  text-align: center;
+  padding: 8px;
+  font-size: 0.85rem;
+  color: var(--tf-slate-600);
+  background: #f8fafc;
+  border-radius: 6px;
+}
+.tf-schedule-cell {
+  height: 52px;
+  text-align: center;
+  vertical-align: middle;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  position: relative;
+}
+.tf-schedule-cell:hover {
+  transform: scale(1.03);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+}
+.tf-slot-free-all {
+  background-color: #bbf7d0;
+  color: #166534;
+  border: 2px solid #22c55e;
+}
+.tf-slot-free-high {
+  background-color: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+.tf-slot-free-med {
+  background-color: #fef9c3;
+  color: #854d0e;
+  border: 1px solid #fde047;
+}
+.tf-slot-free-low {
+  background-color: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+/* Meeting Room Virtual Simulation */
+.tf-video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+.tf-video-box {
+  background: #111827;
+  border-radius: 12px;
+  aspect-ratio: 16 / 9;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  border: 2px solid transparent;
+}
+.tf-video-box.active-speaker {
+  border-color: #10b981;
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.5);
+}
+.tf-video-name {
+  position: absolute;
+  bottom: 10px;
+  left: 12px;
+  background: rgba(0,0,0,0.65);
+  color: #ffffff;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  backdrop-filter: blur(4px);
+}
+.tf-video-status {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  display: flex;
+  gap: 6px;
+}
+.tf-meeting-ctrls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px;
+  background: #1f2937;
+  border-radius: 12px;
+}
+.tf-meeting-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  color: #ffffff;
+  background: #374151;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+.tf-meeting-btn:hover {
+  background: #4b5563;
+  transform: scale(1.08);
+}
+.tf-meeting-btn.btn-danger-room {
+  background: #dc2626;
+}
+.tf-meeting-btn.btn-danger-room:hover {
+  background: #b91c1c;
+}
+.tf-meeting-btn.active-control {
+  background: #059669;
+}
+
+/* Star Rating Widget */
+.star-rating {
+  display: inline-flex;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.star-rating input {
+  display: none;
+}
+.star-rating label {
+  font-size: 1.5rem;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.star-rating label:hover,
+.star-rating label:hover ~ label,
+.star-rating input:checked ~ label {
+  color: #f59e0b;
+}
+
+/* Email Preview Card */
+.tf-email-preview {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  font-size: 0.9rem;
+}
+.tf-email-header {
+  padding: 1rem 1.25rem;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
+.tf-email-body {
+  padding: 1.5rem;
+  line-height: 1.7;
+}
+
+/* Printable Report */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .no-print, .tf-nav-tabs, .btn, .toast-container {
+    display: none !important;
+  }
+  .tf-card {
+    border: 1px solid #ddd !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+}
