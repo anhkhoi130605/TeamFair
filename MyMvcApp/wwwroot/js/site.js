@@ -45,6 +45,20 @@ const TeamFairApp = {
   meetingSeconds: 0,
 
   async init() {
+    // Kiểm tra thông báo lỗi từ callback nếu có
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has("auth_error")) {
+      const err = urlParams.get("auth_error");
+      if (err === "server_error") {
+        this.showToast("Không thể đồng bộ với Azure SQL Database. Vui lòng thử lại.", "error");
+      } else if (err === "google_failed") {
+        this.showToast("Xác thực Google không thành công. Vui lòng thử lại.", "error");
+      } else if (err === "no_email") {
+        this.showToast("Tài khoản Google không trả về email.", "warning");
+      }
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     this.loadUserSession();
     await this.loadState();
     this.bindEvents();
@@ -211,10 +225,10 @@ const TeamFairApp = {
     if (el) {
       if (isConnected) {
         el.className = "badge bg-success-subtle text-success border border-success-subtle px-2 py-1";
-        el.innerHTML = "🟢 Azure SQL: Đã kết nối";
+        el.innerHTML = "Azure SQL: Đã kết nối";
       } else {
         el.className = "badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1";
-        el.innerHTML = "🟡 Azure SQL: Ngoại tuyến";
+        el.innerHTML = "Azure SQL: Ngoại tuyến";
       }
     }
   },
@@ -326,7 +340,7 @@ const TeamFairApp = {
 
       await this.loadState();
       this.renderAll();
-      this.showToast(`🎉 Đăng ký tài khoản thành công! Chào mừng ${name}. Bạn hiện là 🧑 Thành viên.`, "success");
+      this.showToast(`Đăng ký tài khoản thành công! Chào mừng ${name}. Bạn hiện là Thành viên.`, "success");
     } catch (err) {
       console.error("Lỗi đăng ký:", err);
       alert("Lỗi kết nối đến máy chủ. Vui lòng thử lại!");
@@ -358,7 +372,7 @@ const TeamFairApp = {
       this.saveUserSession();
       await this.loadState();
       this.renderAll();
-      this.showToast(`Đăng nhập thành công! Vai trò: ${data.user.roleType === 'Leader' ? '👑 Nhóm Trưởng' : '🧑 Thành Viên'}`, "success");
+      this.showToast(`Đăng nhập thành công! Vai trò: ${data.user.roleType === 'Leader' ? 'Nhóm Trưởng' : 'Thành Viên'}`, "success");
     } catch (err) {
       console.error("Lỗi đăng nhập:", err);
       alert("Lỗi kết nối đến máy chủ. Vui lòng thử lại!");
@@ -443,7 +457,7 @@ const TeamFairApp = {
       this.saveUserSession();
       await this.loadState();
       this.renderAll();
-      this.showToast(`Chào mừng ${data.user.name}! Đã đăng nhập bằng Google (${data.user.roleType === 'Leader' ? '👑 Nhóm Trưởng' : '🧑 Thành Viên'}).`, "success");
+      this.showToast(`Chào mừng ${data.user.name}! Đã đăng nhập bằng Google (${data.user.roleType === 'Leader' ? 'Nhóm Trưởng' : 'Thành Viên'}).`, "success");
     } catch (err) {
       console.error("Lỗi Google Auth:", err);
       alert("Lỗi kết nối máy chủ khi đăng nhập Google!");
@@ -519,7 +533,7 @@ const TeamFairApp = {
 
       await this.loadState();
       this.renderAll();
-      this.showToast(`🎉 Tạo nhóm thành công! Bạn đã là 👑 Nhóm Trưởng (Mã nhóm: ${data.joinCode})`, "success");
+      this.showToast(`Tạo nhóm thành công! Bạn đã là Nhóm Trưởng (Mã nhóm: ${data.joinCode})`, "success");
     } catch (err) {
       console.error("Lỗi tạo nhóm:", err);
       alert("Lỗi kết nối khi tạo nhóm!");
@@ -573,7 +587,7 @@ const TeamFairApp = {
 
       await this.loadState();
       this.renderAll();
-      this.showToast("Tham gia nhóm thành công với vai trò 🧑 Thành Viên!", "success");
+      this.showToast("Tham gia nhóm thành công với vai trò Thành Viên!", "success");
     } catch (err) {
       console.error("Lỗi tham gia nhóm:", err);
       alert("Lỗi kết nối khi tham gia nhóm!");
@@ -596,10 +610,10 @@ const TeamFairApp = {
   toggleCurrentRole() {
     if (this.currentUser.roleType === "Leader") {
       this.currentUser.roleType = "Member";
-      this.showToast("Đang xem dưới góc nhìn 🧑 Thành Viên.", "info");
+      this.showToast("Đang xem dưới góc nhìn Thành Viên.", "info");
     } else {
       this.currentUser.roleType = "Leader";
-      this.showToast("Đang xem dưới góc nhìn 👑 Nhóm Trưởng.", "info");
+      this.showToast("Đang xem dưới góc nhìn Nhóm Trưởng.", "info");
     }
     this.saveUserSession();
     this.renderAll();
@@ -883,7 +897,7 @@ const TeamFairApp = {
     const elRoleTag = document.getElementById("userRoleTag");
     if (elRoleTag) {
       elRoleTag.className = isLeader ? "badge bg-success" : "badge bg-primary";
-      elRoleTag.innerHTML = isLeader ? "👑 Nhóm Trưởng" : "🧑 Thành Viên";
+      elRoleTag.innerHTML = isLeader ? "Nhóm Trưởng" : "Thành Viên";
     }
 
     const elAvatar = document.getElementById("userAvatarBadge");
@@ -901,7 +915,7 @@ const TeamFairApp = {
     const elDDRole = document.getElementById("ddRoleBadge");
     if (elDDRole) {
       elDDRole.className = isLeader ? "badge bg-success" : "badge bg-primary";
-      elDDRole.textContent = isLeader ? "👑 Nhóm Trưởng (Leader)" : "🧑 Thành Viên (Member)";
+      elDDRole.textContent = isLeader ? "Nhóm Trưởng (Leader)" : "Thành Viên (Member)";
     }
 
     const elTabTitle = document.getElementById("tabDashboardTitle");
@@ -923,17 +937,17 @@ const TeamFairApp = {
       if (isLeader) {
         elBanner.style.background = "linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%)";
         elBanner.style.borderColor = "#bbf7d0";
-        elIcon.innerHTML = "👑";
+        elIcon.innerHTML = "";
         elTitle.textContent = "Bảng Điều Khiển Quản Trị - Nhóm Trưởng";
         elDesc.textContent = "Bạn đang có toàn quyền quản trị: theo dõi chỉ số công bằng nhóm, giao việc, duyệt tiến độ và nhắc nhở thành viên.";
-        elBtnSwitch.textContent = "🧑 Chuyển sang xem Dashboard Thành Viên";
+        elBtnSwitch.textContent = "Chuyển sang xem Dashboard Thành Viên";
       } else {
         elBanner.style.background = "linear-gradient(135deg, #eef2ff 0%, #fdf4ff 100%)";
         elBanner.style.borderColor = "#c7d2fe";
-        elIcon.innerHTML = "🧑";
+        elIcon.innerHTML = "";
         elTitle.textContent = `Không Gian Làm Việc Cá Nhân - ${this.currentUser.name}`;
         elDesc.textContent = "Không gian dành riêng cho bạn: cập nhật tiến độ công việc được giao, chấm điểm chéo đồng đội và xếp lịch rảnh.";
-        elBtnSwitch.textContent = "👑 Chuyển sang Dashboard Nhóm Trưởng";
+        elBtnSwitch.textContent = "Chuyển sang Dashboard Nhóm Trưởng";
       }
     }
 
@@ -1021,10 +1035,10 @@ const TeamFairApp = {
           </div>
           <div class="d-flex gap-2">
             <button class="btn btn-sm btn-success text-white" onclick="TeamFairApp.approveTaskByLeader('${t.id}')">
-              ✓ Duyệt xong
+              Duyệt xong
             </button>
             <button class="btn btn-sm btn-outline-secondary" onclick="TeamFairApp.openReviewModal('${t.id}')">
-              ⭐ Chấm điểm chéo
+              Chấm điểm chéo
             </button>
           </div>
         </div>
@@ -1076,7 +1090,7 @@ const TeamFairApp = {
 
     // KPI 3: Peer Rating
     const elRating = document.getElementById("member-kpi-rating");
-    if (elRating) elRating.textContent = `${myStat.avgScore} ⭐`;
+    if (elRating) elRating.textContent = `${myStat.avgScore}`;
 
     const elMult = document.getElementById("member-kpi-quality-mult");
     if (elMult) elMult.textContent = `Hệ số chất lượng: x${myStat.qualityMultiplier.toFixed(2)}`;
@@ -1108,7 +1122,7 @@ const TeamFairApp = {
     if (!myTasks.length) {
       container.innerHTML = `
         <div class="p-5 text-center text-muted">
-          <div class="fs-1 mb-2">🎉</div>
+          
           <div class="fw-semibold">Bạn chưa có công việc nào được phân công.</div>
           <div class="small mt-1">Trưởng nhóm sẽ phân chia đầu việc cho bạn sớm nhất.</div>
         </div>
@@ -1156,10 +1170,10 @@ const TeamFairApp = {
               <div>
                 ${t.status !== 'done' ? `
                   <button class="btn btn-sm btn-warning text-dark fw-semibold" onclick="TeamFairApp.submitTaskForReview('${t.id}')">
-                    📤 Báo cáo nộp / Gửi duyệt
+                    Báo cáo nộp / Gửi duyệt
                   </button>
                 ` : `
-                  <span class="text-success small fw-semibold">✓ Đã hoàn thành</span>
+                  <span class="text-success small fw-semibold">Đã hoàn thành</span>
                 `}
               </div>
             </div>
@@ -1243,7 +1257,7 @@ const TeamFairApp = {
           <div class="d-flex justify-content-between align-items-center">
             <span class="small text-muted">Làm bởi: <strong class="text-primary">${assignee.name}</strong></span>
             <button class="btn btn-sm btn-tf-indigo text-white py-1" onclick="TeamFairApp.openReviewModal('${t.id}')">
-              ⭐ Chấm điểm
+              Chấm điểm
             </button>
           </div>
         </div>
@@ -1285,7 +1299,7 @@ const TeamFairApp = {
           <td class="cursor-pointer ${isFree ? 'bg-success-subtle text-success fw-bold' : 'text-muted'}" 
               onclick="TeamFairApp.toggleScheduleSlot('${slotKey}')" 
               style="cursor: pointer; height: 38px;">
-            ${isFree ? '✓ Rảnh' : '—'}
+            ${isFree ? 'Rảnh' : '—'}
           </td>
         `;
       });
@@ -1333,7 +1347,7 @@ const TeamFairApp = {
     if (this.state.members.length === 0 || this.state.tasks.length === 0) {
       container.innerHTML = `
         <div class="py-5 text-center text-muted">
-          <div class="fs-1 mb-2">📊</div>
+          
           <div class="fw-semibold">Thêm thành viên và giao việc để xem tiến độ.</div>
           <div class="small text-muted mt-1">Mức đóng góp sẽ tự động cập nhật ngay khi bạn phân công công việc đầu tiên.</div>
           <button class="btn btn-sm btn-primary mt-3" onclick="TeamFairApp.switchTab('tasks')">
@@ -1356,7 +1370,7 @@ const TeamFairApp = {
               <span class="tf-avatar" style="background-color: ${m.color}; width: 28px; height: 28px; font-size: 0.75rem;">${m.avatar}</span>
               <strong class="text-slate-800" style="font-size: 0.9rem;">${m.name}</strong>
               <span class="badge ${m.roleType === 'Leader' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'}" style="font-size: 0.7rem;">
-                ${m.roleType === 'Leader' ? '👑 Trưởng nhóm' : 'Thành viên'}
+                ${m.roleType === 'Leader' ? 'Trưởng nhóm' : 'Thành viên'}
               </span>
             </div>
             <div class="text-end">
@@ -1368,7 +1382,7 @@ const TeamFairApp = {
             <div class="progress-bar" role="progressbar" style="width: ${pct}%; background-color: ${m.color}; border-radius: 99px;"></div>
           </div>
           <div class="d-flex justify-content-between mt-1 text-muted" style="font-size: 0.75rem;">
-            <span>Chất lượng chéo: <strong>${stat.avgScore} ⭐</strong> (x${stat.qualityMultiplier.toFixed(2)})</span>
+            <span>Chất lượng chéo: <strong>${stat.avgScore}</strong> (x${stat.qualityMultiplier.toFixed(2)})</span>
             <span>Kỳ vọng: ${(100 / this.state.members.length).toFixed(1)}%</span>
           </div>
         </div>
@@ -1435,7 +1449,7 @@ const TeamFairApp = {
           </div>
           <div class="d-flex gap-2">
             <button class="btn btn-sm btn-outline-primary" onclick="TeamFairApp.sendTaskReminderEmail('${t.id}')">
-              ✉️ Nhắc nhở email
+              Nhắc nhở email
             </button>
             <button class="btn btn-sm btn-light border" onclick="TeamFairApp.quickUpdateProgress('${t.id}')">
               Tiến độ: ${t.progress}%
@@ -1519,7 +1533,7 @@ const TeamFairApp = {
             <div>
               <div class="fw-bold text-slate-800" style="font-size: 0.875rem;">
                 ${m.name}
-                ${isLeaderMember ? '<span class="badge bg-success" style="font-size: 0.65rem;">👑 Trưởng nhóm</span>' : ''}
+                ${isLeaderMember ? '<span class="badge bg-success" style="font-size: 0.65rem;">Trưởng nhóm</span>' : ''}
               </div>
               <div class="text-muted" style="font-size: 0.75rem;">${m.email || 'Chưa có email'}${skillText}</div>
             </div>
@@ -1567,7 +1581,7 @@ const TeamFairApp = {
         else if (t.reminderTiming === '6_hours') timingText = 'Trước 6 giờ';
         else if (t.reminderTiming === 'on_deadline') timingText = 'Đúng ngày hạn';
         else if (t.reminderTiming === 'custom' && t.reminderCustomDateTime) timingText = t.reminderCustomDateTime.replace('T', ' ');
-        reminderBadge = `<span class="badge bg-warning-subtle text-warning border border-warning-subtle small ms-1" title="Cấu hình gửi email nhắc deadline: ${timingText}">⏰ Nhắc mail: ${timingText}${t.reminderSent ? ' (Đã gửi ✓)' : ''}</span>`;
+        reminderBadge = `<span class="badge bg-warning-subtle text-warning border border-warning-subtle small ms-1" title="Cấu hình gửi email nhắc deadline: ${timingText}">Nhắc mail: ${timingText}${t.reminderSent ? ' (Đã gửi ✓)' : ''}</span>`;
       }
 
       return `
@@ -1579,7 +1593,7 @@ const TeamFairApp = {
                 <span class="badge ${diff.badge}">${diff.label}</span>
                 <span class="badge bg-light text-slate-600 border">${t.category || "Công việc"}</span>
                 ${reminderBadge}
-                ${isMyTask ? '<span class="badge bg-primary-subtle text-primary fw-bold">📌 Việc của bạn</span>' : ''}
+                ${isMyTask ? '<span class="badge bg-primary-subtle text-primary fw-bold">Việc của bạn</span>' : ''}
               </div>
               <div class="d-flex align-items-center gap-2">
                 <span class="text-muted small">Hạn: <strong>${t.deadline ? t.deadline.split('-').reverse().join('/') : "Chưa đặt"}</strong></span>
@@ -1606,13 +1620,13 @@ const TeamFairApp = {
               </div>
               <div class="col-md-4 text-md-end d-flex justify-content-md-end gap-1 flex-wrap">
                 <button class="btn btn-sm btn-light border py-1" onclick="TeamFairApp.quickUpdateProgress('${t.id}')">
-                  📊 Tiến độ
+                  Tiến độ
                 </button>
                 <button class="btn btn-sm btn-light border py-1" onclick="TeamFairApp.sendTaskReminderEmail('${t.id}')" title="Gửi email nhắc nhở trực tiếp ngay bây giờ">
-                  ✉️ Nhắc mail
+                  Nhắc mail
                 </button>
                 <button class="btn btn-sm btn-tf-indigo py-1 text-white" onclick="TeamFairApp.openReviewModal('${t.id}')">
-                  ⭐ Đánh giá
+                  Đánh giá
                 </button>
               </div>
             </div>
@@ -1735,7 +1749,7 @@ const TeamFairApp = {
 
     this.state.activities.unshift({
       time: "Vừa xong",
-      text: `Đã thêm thành viên mới: ${name} (${roleType === 'Leader' ? '👑 Trưởng nhóm' : 'Thành viên'}).`,
+      text: `Đã thêm thành viên mới: ${name} (${roleType === 'Leader' ? 'Trưởng nhóm' : 'Thành viên'}).`,
       type: "member"
     });
 
@@ -1821,7 +1835,7 @@ const TeamFairApp = {
       if (container) {
         container.innerHTML = `
           <div class="p-5 text-center text-muted">
-            <div class="fs-1 mb-2">🗓️</div>
+            
             <div class="fw-semibold">Chưa có thành viên nào trong nhóm.</div>
             <div class="small mt-1">Vui lòng thêm các thành viên trước để bắt đầu xếp lịch rảnh và tìm giờ họp chung.</div>
           </div>
@@ -1926,18 +1940,18 @@ const TeamFairApp = {
         goldenBox.innerHTML = `
           <div class="alert alert-success d-flex align-items-center justify-content-between p-3 mb-0">
             <div>
-              <strong>🌟 Khung giờ vàng tìm thấy:</strong> Có <strong>${bestSlots.length}</strong> buổi trong tuần cả <strong>${totalMembers}/${totalMembers} thành viên</strong> đều rảnh!
+              <strong>Khung giờ vàng tìm thấy:</strong> Có <strong>${bestSlots.length}</strong> buổi trong tuần cả <strong>${totalMembers}/${totalMembers} thành viên</strong> đều rảnh!
               <div class="small mt-1 text-slate-700">Gợi ý tốt nhất: <strong>${bestSlots[0].day} - ${bestSlots[0].shift}</strong></div>
             </div>
             <button class="btn btn-sm btn-success text-white text-nowrap" onclick="TeamFairApp.scheduleMeetingAtGoldenSlot('${bestSlots[0].day}', '${bestSlots[0].shift}')">
-              📅 Đặt phòng họp ngay
+              Đặt phòng họp ngay
             </button>
           </div>
         `;
       } else {
         goldenBox.innerHTML = `
           <div class="alert alert-warning p-3 mb-0">
-            <strong>⚠️ Chưa có khung giờ nào 100% thành viên cùng rảnh.</strong> Hãy bấm vào các ô trên để cập nhật giờ rảnh cá nhân!
+            <strong>️ Chưa có khung giờ nào 100% thành viên cùng rảnh.</strong> Hãy bấm vào các ô trên để cập nhật giờ rảnh cá nhân!
           </div>
         `;
       }
@@ -1985,17 +1999,17 @@ const TeamFairApp = {
           </div>
           <h6 class="fw-bold text-slate-900 mb-1">${mt.title}</h6>
           <div class="text-muted small mb-2">
-            📅 ${mt.date ? mt.date.split('-').reverse().join('/') : ""} lúc ⏰ <strong>${mt.time}</strong> (${mt.duration} phút)
+            ${mt.date ? mt.date.split('-').reverse().join('/') : ""} lúc <strong>${mt.time}</strong> (${mt.duration} phút)
           </div>
           <div class="p-2 bg-light rounded-3 small text-slate-700 mb-3" style="white-space: pre-line;">
             <strong>Nội dung / Biên bản:</strong>\n${mt.notes || "Chưa có ghi chú."}
           </div>
           <div class="d-flex gap-2">
             <button class="btn btn-sm btn-tf-primary text-white" onclick="TeamFairApp.enterVirtualMeeting('${mt.id}')">
-              📹 Vào phòng họp ảo ngay
+              Vào phòng họp ảo ngay
             </button>
             <button class="btn btn-sm btn-outline-primary" onclick="TeamFairApp.sendMeetingInviteEmail('${mt.id}')">
-              ✉️ Gửi email mời họp
+              Gửi email mời họp
             </button>
           </div>
         </div>
@@ -2079,7 +2093,7 @@ const TeamFairApp = {
         videoGrid.innerHTML = `
           <div class="tf-video-box active-speaker" style="grid-column: 1 / -1;">
             <div class="text-center text-white p-4">
-              <div class="fs-1 mb-2">📹</div>
+              
               <div class="fw-bold">${this.currentUser.name} (Đang trực tuyến)</div>
               <div class="text-muted small mt-1">Phòng họp ảo đang sẵn sàng.</div>
             </div>
@@ -2097,7 +2111,7 @@ const TeamFairApp = {
               <div class="text-muted small">${m.role}</div>
             </div>
             <div class="tf-video-status">
-              <span class="badge bg-dark bg-opacity-75">🎙️ ON</span>
+              <span class="badge bg-dark bg-opacity-75">ON</span>
             </div>
             <div class="tf-video-name">${m.name}</div>
           </div>
@@ -2113,7 +2127,7 @@ const TeamFairApp = {
     this.micOn = !this.micOn;
     const btn = document.getElementById("btnToggleMic");
     if (btn) {
-      btn.innerHTML = this.micOn ? "🎙️" : "🔇";
+      btn.innerHTML = this.micOn ? "Mic (Bật)" : "Mic (Tắt)";
       btn.classList.toggle("btn-danger-room", !this.micOn);
     }
     this.showToast(this.micOn ? "Đã bật micro" : "Đã tắt micro", "info");
@@ -2123,7 +2137,7 @@ const TeamFairApp = {
     this.cameraOn = !this.cameraOn;
     const btn = document.getElementById("btnToggleCamera");
     if (btn) {
-      btn.innerHTML = this.cameraOn ? "📹" : "📷";
+      btn.innerHTML = this.cameraOn ? "Cam (Bật)" : "Cam (Tắt)";
       btn.classList.toggle("btn-danger-room", !this.cameraOn);
     }
     this.showToast(this.cameraOn ? "Đã bật camera" : "Đã tắt camera", "info");
@@ -2167,7 +2181,7 @@ const TeamFairApp = {
     if (!listContainer) return;
 
     if (!this.state.reviews.length) {
-      listContainer.innerHTML = `<div class="p-5 text-center text-muted">Chưa có đánh giá chéo nào được gửi. Khi hoàn thành công việc, hãy bấm nút "⭐ Đánh giá chéo" để đánh giá đồng đội!</div>`;
+      listContainer.innerHTML = `<div class="p-5 text-center text-muted">Chưa có đánh giá chéo nào được gửi. Khi hoàn thành công việc, hãy bấm nút "Đánh giá chéo" để đánh giá đồng đội!</div>`;
       return;
     }
 
@@ -2182,7 +2196,7 @@ const TeamFairApp = {
           <div class="card-body p-3">
             <div class="d-flex justify-content-between align-items-start mb-2">
               <div>
-                <span class="badge bg-success-subtle text-success fw-bold">⭐ ${avg} / 5.0</span>
+                <span class="badge bg-success-subtle text-success fw-bold">${avg} / 5.0</span>
                 <span class="text-muted small ms-2">${rev.createdAt}</span>
               </div>
               <span class="badge bg-light text-slate-700 border">Mã đầu việc: ${task.id}</span>
@@ -2193,10 +2207,10 @@ const TeamFairApp = {
             </div>
 
             <div class="row g-2 mb-2 p-2 bg-light rounded-3 small">
-              <div class="col-6 col-md-3">Chất lượng: <strong>${rev.quality} ⭐</strong></div>
-              <div class="col-6 col-md-3">Đúng hạn: <strong>${rev.punctuality} ⭐</strong></div>
-              <div class="col-6 col-md-3">Độ khó nỗ lực: <strong>${rev.effort} ⭐</strong></div>
-              <div class="col-6 col-md-3">Hợp tác: <strong>${rev.cooperation} ⭐</strong></div>
+              <div class="col-6 col-md-3">Chất lượng: <strong>${rev.quality}</strong></div>
+              <div class="col-6 col-md-3">Đúng hạn: <strong>${rev.punctuality}</strong></div>
+              <div class="col-6 col-md-3">Độ khó nỗ lực: <strong>${rev.effort}</strong></div>
+              <div class="col-6 col-md-3">Hợp tác: <strong>${rev.cooperation}</strong></div>
             </div>
 
             <div class="p-2 border-start border-4 border-success bg-white small fst-italic">
@@ -2295,15 +2309,15 @@ const TeamFairApp = {
     }
 
     listContainer.innerHTML = this.state.emails.map(em => {
-      let typeBadge = '<span class="badge bg-primary-subtle text-primary border border-primary-subtle me-1">✉️ Thông báo</span>';
+      let typeBadge = '<span class="badge bg-primary-subtle text-primary border border-primary-subtle me-1">Thông báo</span>';
       if (em.type === 'task_completed') {
-        typeBadge = '<span class="badge bg-success-subtle text-success border border-success-subtle me-1">🎯 Hoàn thành nhiệm vụ (Gửi toàn team)</span>';
+        typeBadge = '<span class="badge bg-success-subtle text-success border border-success-subtle me-1">Hoàn thành nhiệm vụ (Gửi toàn team)</span>';
       } else if (em.type === 'deadline_reminder' || em.type === 'reminder') {
-        typeBadge = '<span class="badge bg-warning-subtle text-warning border border-warning-subtle me-1">⏰ Nhắc nhở hạn chót</span>';
+        typeBadge = '<span class="badge bg-warning-subtle text-warning border border-warning-subtle me-1">Nhắc nhở hạn chót</span>';
       } else if (em.type === 'task_assigned') {
-        typeBadge = '<span class="badge bg-primary-subtle text-primary border border-primary-subtle me-1">📋 Giao việc mới</span>';
+        typeBadge = '<span class="badge bg-primary-subtle text-primary border border-primary-subtle me-1">Giao việc mới</span>';
       } else if (em.type === 'meeting') {
-        typeBadge = '<span class="badge bg-info-subtle text-info border border-info-subtle me-1">📹 Nhắc lịch họp</span>';
+        typeBadge = '<span class="badge bg-info-subtle text-info border border-info-subtle me-1">Nhắc lịch họp</span>';
       }
 
       return `
@@ -2324,7 +2338,7 @@ const TeamFairApp = {
             </div>
             <div class="text-end mt-2">
               <button class="btn btn-sm btn-outline-primary" onclick="TeamFairApp.previewEmailModal('${em.id}')">
-                🔍 Xem định dạng HTML chuẩn
+                Xem định dạng HTML chuẩn
               </button>
             </div>
           </div>
@@ -2375,14 +2389,14 @@ const TeamFairApp = {
     let sentCount = 0;
     this.state.members.forEach(member => {
       if (member.email) {
-        const subject = `[TeamFair 🎉 Báo Cáo Hoàn Thành] ${completedByName} đã xong: "${task.title}"`;
+        const subject = `[TeamFair Báo Cáo Hoàn Thành] ${completedByName} đã xong: "${task.title}"`;
         const content = `Chào ${member.name},\n\n` +
           `Thành viên ${completedByName} vừa cập nhật hoàn thành 100% nhiệm vụ thuộc đồ án "${teamName}".\n\n` +
-          `📌 Nhiệm vụ: "${task.title}"\n` +
-          `⭐ Độ khó: ${this.getDifficultyLabel(task.difficulty).label}\n` +
-          `📅 Hoàn thành lúc: ${timeStr}\n` +
-          `🔗 Minh chứng nộp bài: ${task.submissionLink || "Đã lưu trên hệ thống TeamFair"}\n` +
-          `📝 Ghi chú: ${task.submissionNote || "Nhiệm vụ đã hoàn thành đạt yêu cầu"}\n\n` +
+          `Nhiệm vụ: "${task.title}"\n` +
+          `Độ khó: ${this.getDifficultyLabel(task.difficulty).label}\n` +
+          `Hoàn thành lúc: ${timeStr}\n` +
+          `Minh chứng nộp bài: ${task.submissionLink || "Đã lưu trên hệ thống TeamFair"}\n` +
+          `Ghi chú: ${task.submissionNote || "Nhiệm vụ đã hoàn thành đạt yêu cầu"}\n\n` +
           `Các thành viên trong nhóm hãy kiểm tra và có thể tiến hành Chấm điểm chéo đánh giá cho đồng đội trên hệ thống TeamFair.`;
 
         this.sendEmailNotification({
@@ -2398,13 +2412,13 @@ const TeamFairApp = {
 
     this.state.activities.unshift({
       time: "Vừa xong",
-      text: `🎉 ${completedByName} hoàn thành nhiệm vụ '${task.title}' và hệ thống đã gửi email thông báo tới ${sentCount} thành viên trong nhóm.`,
+      text: `${completedByName} hoàn thành nhiệm vụ '${task.title}' và hệ thống đã gửi email thông báo tới ${sentCount} thành viên trong nhóm.`,
       type: "email"
     });
 
     this.saveState();
     this.renderAll();
-    this.showToast(`🎉 Đã cập nhật xong nhiệm vụ! Tự động gửi email thông báo đến toàn bộ ${sentCount} thành viên trong nhóm.`, "success");
+    this.showToast(`Đã cập nhật xong nhiệm vụ! Tự động gửi email thông báo đến toàn bộ ${sentCount} thành viên trong nhóm.`, "success");
   },
 
   /* Quét và gửi email nhắc deadline cho các thành viên theo cấu hình (Requirement) */
@@ -2448,14 +2462,14 @@ const TeamFairApp = {
         const teamName = this.state.team?.name || "Đồ án nhóm";
         const deadlineFormatted = task.deadline.split('-').reverse().join('/');
 
-        const subject = `[TeamFair ⏰ Nhắc Hạn Chót] Nhiệm vụ "${task.title}" sắp tới hạn!`;
+        const subject = `[TeamFair Nhắc Hạn Chót] Nhiệm vụ "${task.title}" sắp tới hạn!`;
         const content = `Chào ${assignee.name},\n\n` +
           `Hệ thống TeamFair xin gửi thông báo nhắc nhở về hạn chót nhiệm vụ của bạn:\n\n` +
-          `📌 Nhiệm vụ: "${task.title}"\n` +
-          `⭐ Độ khó: ${this.getDifficultyLabel(task.difficulty).label}\n` +
-          `⏰ Hạn chót hoàn thành: ${deadlineFormatted}\n` +
-          `📊 Tiến độ hiện tại: ${task.progress}%\n` +
-          `📁 Nhóm: ${teamName}\n\n` +
+          `Nhiệm vụ: "${task.title}"\n` +
+          `Độ khó: ${this.getDifficultyLabel(task.difficulty).label}\n` +
+          `Hạn chót hoàn thành: ${deadlineFormatted}\n` +
+          `Tiến độ hiện tại: ${task.progress}%\n` +
+          `Nhóm: ${teamName}\n\n` +
           `Vui lòng khẩn trương hoàn thiện, cập nhật tiến độ hoặc nộp minh chứng bài làm lên hệ thống để đảm bảo tiến độ chung của toàn đội!`;
 
         this.sendEmailNotification({
@@ -2471,7 +2485,7 @@ const TeamFairApp = {
 
         this.state.activities.unshift({
           time: "Vừa xong",
-          text: `⏰ Đã tự động gửi email nhắc hạn chót nhiệm vụ '${task.title}' đến ${assignee.name} (${assignee.email}).`,
+          text: `Đã tự động gửi email nhắc hạn chót nhiệm vụ '${task.title}' đến ${assignee.name} (${assignee.email}).`,
           type: "email"
         });
       }
@@ -2481,7 +2495,7 @@ const TeamFairApp = {
       this.saveState();
       this.renderAll();
       if (manualTrigger) {
-        this.showToast(`🔔 Đã quét và gửi email nhắc deadline thành công cho ${remindersSent} nhiệm vụ sắp đến hạn!`, "success");
+        this.showToast(`Đã quét và gửi email nhắc deadline thành công cho ${remindersSent} nhiệm vụ sắp đến hạn!`, "success");
       }
     } else if (manualTrigger) {
       this.showToast("✓ Tất cả các nhiệm vụ đều chưa tới hạn nhắc nhở hoặc đã được gửi email trước đó.", "info");
@@ -2667,7 +2681,7 @@ const TeamFairApp = {
             <td class="small" style="max-width: 320px;">
               ${taskTitles}
             </td>
-            <td class="text-center fw-bold text-primary">${stat.avgScore} ⭐</td>
+            <td class="text-center fw-bold text-primary">${stat.avgScore}</td>
             <td class="text-center fw-bold text-success">${stat.finalPoints.toFixed(1)} đ</td>
             <td class="text-center fw-bold" style="font-size: 1.05rem;">
               ${pct}%
@@ -2700,7 +2714,7 @@ const TeamFairApp = {
     toastEl.innerHTML = `
       <div class="d-flex">
         <div class="toast-body fw-semibold">
-          ${type === 'success' ? '✅' : type === 'danger' ? '⚠️' : 'ℹ️'} ${message}
+          ${type === 'success' ? '' : type === 'danger' ? '️' : 'ℹ️'} ${message}
         </div>
         <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
       </div>
@@ -2922,7 +2936,7 @@ const TeamFairApp = {
     this.saveUserSession();
     this.saveState();
     this.renderAll();
-    this.showToast("✨ Đã nạp thành công Dữ liệu mẫu (Demo Workspace)! Bạn đang trải nghiệm đầy đủ vai trò Nhóm Trưởng.", "success");
+    this.showToast("Đã nạp thành công Dữ liệu mẫu (Demo Workspace)! Bạn đang trải nghiệm đầy đủ vai trò Nhóm Trưởng.", "success");
   },
 
   openOnboardingGuide() {

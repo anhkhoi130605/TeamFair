@@ -57,52 +57,62 @@ public class AuthController : Controller
 
             var cleanEmail = emailClaim.Trim().ToLowerInvariant();
 
-            // Lưu/cập nhật tài khoản người dùng vào Azure SQL Database
-            var user = await _db.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == cleanEmail);
-            if (user == null)
-            {
-                var words = nameClaim.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                var avatar = words.Length >= 2
-                    ? (words[0][0].ToString() + words[^1][0].ToString()).ToUpper()
-                    : (nameClaim.Length >= 2 ? nameClaim[..2].ToUpper() : "GG");
+            // Tính toán avatar & màu sắc mặc định từ Google
+            var words = nameClaim.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var defaultAvatar = words.Length >= 2
+                ? (words[0][0].ToString() + words[^1][0].ToString()).ToUpper()
+                : (nameClaim.Length >= 2 ? nameClaim[..2].ToUpper() : "GG");
 
-                string[] colors = { "#ea4335", "#4285f4", "#fbbc05", "#34a853", "#059669", "#7c3aed" };
-                var color = colors[Math.Abs(cleanEmail.GetHashCode()) % colors.Length];
+            string[] colors = { "#ea4335", "#4285f4", "#fbbc05", "#34a853", "#059669", "#7c3aed" };
+            var defaultColor = colors[Math.Abs(cleanEmail.GetHashCode()) % colors.Length];
 
-                user = new AppUser
-                {
-                    Name = nameClaim,
-                    Email = cleanEmail,
-                    Password = "google_oauth_" + Guid.NewGuid().ToString("N")[..8],
-                    Avatar = avatar,
-                    Color = color,
-                    CreatedAt = DateTime.UtcNow
-                };
-
-                _db.Users.Add(user);
-                await _db.SaveChangesAsync();
-            }
-
-            // Kiểm tra phân quyền trưởng nhóm / thành viên
-            var team = await _db.Teams.FirstOrDefaultAsync();
-            var member = await _db.Members.FirstOrDefaultAsync(m => m.Email.ToLower() == cleanEmail);
+            AppUser? user = null;
             bool isLeader = false;
-            if (team != null && !string.IsNullOrEmpty(team.CreatedByEmail) && team.CreatedByEmail.ToLower() == cleanEmail)
+
+            // Cố gắng lưu/cập nhật tài khoản vào Azure SQL Database (nếu DB khả dụng)
+            try
             {
-                isLeader = true;
+                user = await _db.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == cleanEmail);
+                if (user == null)
+                {
+                    user = new AppUser
+                    {
+                        Name = nameClaim,
+                        Email = cleanEmail,
+                        Password = "google_oauth_" + Guid.NewGuid().ToString("N")[..8],
+                        Avatar = defaultAvatar,
+                        Color = defaultColor,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    _db.Users.Add(user);
+                    await _db.SaveChangesAsync();
+                }
+
+                // Kiểm tra phân quyền trưởng nhóm / thành viên
+                var team = await _db.Teams.FirstOrDefaultAsync();
+                var member = await _db.Members.FirstOrDefaultAsync(m => m.Email.ToLower() == cleanEmail);
+                if (team != null && !string.IsNullOrEmpty(team.CreatedByEmail) && team.CreatedByEmail.ToLower() == cleanEmail)
+                {
+                    isLeader = true;
+                }
+                else if (member != null && string.Equals(member.RoleType, "Leader", StringComparison.OrdinalIgnoreCase))
+                {
+                    isLeader = true;
+                }
             }
-            else if (member != null && string.Equals(member.RoleType, "Leader", StringComparison.OrdinalIgnoreCase))
+            catch (Exception dbEx)
             {
-                isLeader = true;
+                _logger.LogWarning(dbEx, "Không thể kết nối hoặc lưu dữ liệu vào Azure SQL Database, tiếp tục với tài khoản Google.");
             }
 
             var userPayload = new
             {
-                id = user.Id.ToString(),
-                name = user.Name,
-                email = user.Email,
-                avatar = user.Avatar,
-                color = user.Color,
+                id = user != null ? user.Id.ToString() : ("gg_" + Math.Abs(cleanEmail.GetHashCode())),
+                name = user?.Name ?? nameClaim,
+                email = user?.Email ?? cleanEmail,
+                avatar = user?.Avatar ?? defaultAvatar,
+                color = user?.Color ?? defaultColor,
                 roleType = isLeader ? "Leader" : "Member",
                 role = isLeader ? "Trưởng nhóm" : "Thành viên"
             };
