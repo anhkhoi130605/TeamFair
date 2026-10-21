@@ -760,10 +760,12 @@ public class ApiController : ControllerBase
                 {
                     int.TryParse(smtpPortStr, out var port);
                     if (port == 0) port = 587;
-                    using var client = new System.Net.Mail.SmtpClient(smtpHost, port)
+                    using var client = new System.Net.Mail.SmtpClient(smtpHost.Trim(), port)
                     {
-                        Credentials = new System.Net.NetworkCredential(smtpUser, smtpPass),
-                        EnableSsl = true
+                        UseDefaultCredentials = false,
+                        Credentials = new System.Net.NetworkCredential(smtpUser.Trim(), smtpPass.Trim().Replace(" ", "")),
+                        EnableSsl = true,
+                        DeliveryMethod = System.Net.Mail.SmtpDeliveryMethod.Network
                     };
                     using var mailMsg = new System.Net.Mail.MailMessage
                     {
