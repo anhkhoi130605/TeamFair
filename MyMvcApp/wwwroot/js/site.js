@@ -316,6 +316,52 @@ const TeamFairApp = {
     this.showToast("Đã đăng xuất tài khoản.", "info");
   },
 
+  handleGoogleAuthPrompt() {
+    const modalEl = document.getElementById("modalGoogleAuth");
+    if (modalEl) {
+      const modal = new bootstrap.Modal(modalEl);
+      modal.show();
+    }
+  },
+
+  async handleGoogleLoginSubmit(presetEmail = null, presetName = null) {
+    let email = presetEmail || document.getElementById("inputGoogleEmail")?.value.trim();
+    let name = presetName || document.getElementById("inputGoogleName")?.value.trim();
+
+    if (!email) {
+      alert("Vui lòng nhập địa chỉ Email Google!");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/auth/google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, name: name || "" })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        alert(data.message || "Đăng nhập Google không thành công!");
+        return;
+      }
+
+      const modalEl = document.getElementById("modalGoogleAuth");
+      if (modalEl) {
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+      }
+
+      this.currentUser = data.user;
+      this.saveUserSession();
+      await this.loadState();
+      this.renderAll();
+      this.showToast(`Chào mừng ${data.user.name}! Đã đăng nhập bằng Google (${data.user.roleType === 'Leader' ? '👑 Nhóm Trưởng' : '🧑 Thành Viên'}).`, "success");
+    } catch (err) {
+      console.error("Lỗi Google Auth:", err);
+      alert("Lỗi kết nối máy chủ khi đăng nhập Google!");
+    }
+  },
+
   openCreateTeamModal() {
     const modalEl = document.getElementById("modalCreateTeam");
     if (modalEl) {

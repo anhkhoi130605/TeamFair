@@ -196,6 +196,81 @@ public class ApiController : ControllerBase
         }
     }
 
+    [HttpPost("auth/google")]
+    public async Task<IActionResult> GoogleAuth([FromBody] GoogleAuthDto dto)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(dto.Email))
+            {
+                return BadRequest(new { success = false, message = "Email Google không hợp lệ." });
+            }
+
+            var cleanEmail = dto.Email.Trim().ToLowerInvariant();
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == cleanEmail);
+
+            if (user == null)
+            {
+                // Tự động tạo tài khoản Google vào Azure SQL Database
+                var displayName = !string.IsNullOrWhiteSpace(dto.Name) ? dto.Name.Trim() : cleanEmail.Split('@')[0];
+                var words = displayName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                var avatar = words.Length >= 2
+                    ? (words[0][0].ToString() + words[^1][0].ToString()).ToUpper()
+                    : (displayName.Length >= 2 ? displayName[..2].ToUpper() : "GG");
+
+                string[] colors = { "#ea4335", "#4285f4", "#fbbc05", "#34a853", "#059669", "#7c3aed" };
+                var color = colors[Math.Abs(cleanEmail.GetHashCode()) % colors.Length];
+
+                user = new AppUser
+                {
+                    Name = displayName,
+                    Email = cleanEmail,
+                    Password = "google_authenticated_" + Guid.NewGuid().ToString("N")[..8],
+                    Avatar = avatar,
+                    Color = color,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _db.Users.Add(user);
+                await _db.SaveChangesAsync();
+            }
+
+            // Kiểm tra xem user này có đang là trưởng nhóm của nhóm hiện tại không
+            var team = await _db.Teams.FirstOrDefaultAsync();
+            var member = await _db.Members.FirstOrDefaultAsync(m => m.Email.ToLower() == cleanEmail);
+
+            bool isLeader = false;
+            if (team != null && !string.IsNullOrEmpty(team.CreatedByEmail) && team.CreatedByEmail.ToLower() == cleanEmail)
+            {
+                isLeader = true;
+            }
+            else if (member != null && string.Equals(member.RoleType, "Leader", StringComparison.OrdinalIgnoreCase))
+            {
+                isLeader = true;
+            }
+
+            return Ok(new
+            {
+                success = true,
+                message = "Đăng nhập Google thành công!",
+                user = new
+                {
+                    id = user.Id.ToString(),
+                    name = user.Name,
+                    email = user.Email,
+                    avatar = user.Avatar,
+                    color = user.Color,
+                    roleType = isLeader ? "Leader" : "Member",
+                    role = isLeader ? "Trưởng nhóm" : "Thành viên"
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
+    }
+
     [HttpPost("team/create")]
     public async Task<IActionResult> CreateTeam([FromBody] CreateTeamDto dto)
     {
@@ -381,7 +456,9 @@ public class ApiController : ControllerBase
                     topic = team.Topic ?? "",
                     subject = team.Subject ?? "",
                     classCode = team.ClassCode ?? "",
-                    finalDeadline = team.FinalDeadline ?? ""
+                    finalDeadline = team.FinalDeadline ?? "",
+                    joinCode = team.JoinCode ?? "",
+                    createdByEmail = team.CreatedByEmail ?? ""
                 },
                 members = members.Select(m => new
                 {
@@ -478,6 +555,8 @@ public class ApiController : ControllerBase
                 team.Subject = dto.Team.Subject;
                 team.ClassCode = dto.Team.ClassCode;
                 team.FinalDeadline = dto.Team.FinalDeadline;
+                if (!string.IsNullOrEmpty(dto.Team.JoinCode)) team.JoinCode = dto.Team.JoinCode;
+                if (!string.IsNullOrEmpty(dto.Team.CreatedByEmail)) team.CreatedByEmail = dto.Team.CreatedByEmail;
             }
 
             // Sync Members
@@ -660,6 +739,14 @@ public class LoginDto
 {
     public string Email { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
+}
+
+public class GoogleAuthDto
+{
+    public string Email { get; set; } = string.Empty;
+    public string? Name { get; set; }
+    public string? PhotoUrl { get; set; }
+    public string? GoogleId { get; set; }
 }
 
 public class CreateTeamDto
