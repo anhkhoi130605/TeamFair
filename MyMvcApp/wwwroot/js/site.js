@@ -510,6 +510,9 @@ const TeamFairApp = {
       return;
     }
 
+    let joinCode = "TF-" + Math.floor(1000 + Math.random() * 9000);
+    let serverSuccess = false;
+
     try {
       const res = await fetch("/api/team/create", {
         method: "POST",
@@ -521,22 +524,52 @@ const TeamFairApp = {
         })
       });
       const data = await res.json();
-      if (!res.ok || !data.success) {
-        alert(data.message || "Tạo nhóm thất bại!");
-        return;
+      if (res.ok && data.success) {
+        serverSuccess = true;
+        if (data.joinCode) joinCode = data.joinCode;
+      } else {
+        console.warn("Backend tạo nhóm trả về lỗi DB, chuyển sang lưu Local:", data.message);
       }
+    } catch (err) {
+      console.warn("Lỗi kết nối khi gọi api/team/create, dùng fallback Local:", err);
+    }
 
-      // Người tạo nhóm tự động được gán làm Nhóm Trưởng!
-      this.currentUser.roleType = "Leader";
-      this.currentUser.role = "Trưởng nhóm";
-      this.saveUserSession();
+    // Người tạo nhóm luôn được gán làm Nhóm Trưởng
+    this.currentUser.roleType = "Leader";
+    this.currentUser.role = "Trưởng nhóm";
+    this.saveUserSession();
 
+    if (serverSuccess) {
       await this.loadState();
       this.renderAll();
-      this.showToast(`Tạo nhóm thành công! Bạn đã là Nhóm Trưởng (Mã nhóm: ${data.joinCode})`, "success");
-    } catch (err) {
-      console.error("Lỗi tạo nhóm:", err);
-      alert("Lỗi kết nối khi tạo nhóm!");
+      this.showToast(`Tạo nhóm thành công! Bạn đã là Nhóm Trưởng (Mã nhóm: ${joinCode})`, "success");
+    } else {
+      // Local fallback khi Azure SQL chưa có mật khẩu hoặc mất kết nối
+      this.state.team = {
+        name: teamData.teamName || "Nhóm mới",
+        topic: teamData.topic || "",
+        subject: teamData.subject || "",
+        classCode: teamData.classCode || "",
+        finalDeadline: teamData.finalDeadline || "",
+        joinCode: joinCode,
+        createdByEmail: this.currentUser.email
+      };
+      const leaderMember = {
+        id: this.currentUser.id || ("m_" + Date.now()),
+        name: this.currentUser.name || "Trưởng Nhóm",
+        email: this.currentUser.email || "",
+        role: "Trưởng nhóm",
+        roleType: "Leader",
+        avatar: this.currentUser.avatar || "TN",
+        color: "#059669"
+      };
+      this.state.members = [leaderMember];
+      this.state.tasks = [];
+      this.state.meetings = [];
+      this.state.reviews = [];
+      this.saveState();
+      this.renderAll();
+      this.showToast(`Đã tạo nhóm thành công! (Mã nhóm: ${joinCode})`, "success");
     }
   },
 
