@@ -70,9 +70,275 @@ public class ApiController : ControllerBase
                 team.Subject = "";
                 team.ClassCode = "";
                 team.FinalDeadline = "";
+                team.JoinCode = null;
+                team.CreatedByEmail = null;
             }
             await _db.SaveChangesAsync();
             return Ok(new { success = true, message = "Đã dọn sạch toàn bộ mock data trên Azure SQL Database!" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
+    }
+
+    [HttpPost("auth/register")]
+    public async Task<IActionResult> Register([FromBody] RegisterDto dto)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.Password) || string.IsNullOrWhiteSpace(dto.Name))
+            {
+                return BadRequest(new { success = false, message = "Vui lòng nhập đầy đủ Họ tên, Email và Mật khẩu." });
+            }
+
+            var cleanEmail = dto.Email.Trim().ToLowerInvariant();
+            var existing = await _db.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == cleanEmail);
+            if (existing != null)
+            {
+                return BadRequest(new { success = false, message = "Email này đã được đăng ký tài khoản." });
+            }
+
+            var words = dto.Name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var avatar = words.Length >= 2
+                ? (words[0][0].ToString() + words[^1][0].ToString()).ToUpper()
+                : (dto.Name.Trim().Length >= 2 ? dto.Name.Trim().Substring(0, 2).ToUpper() : "TV");
+
+            string[] colors = { "#2563eb", "#059669", "#7c3aed", "#ea580c", "#0891b2", "#db2777" };
+            var color = colors[Math.Abs(cleanEmail.GetHashCode()) % colors.Length];
+
+            var newUser = new AppUser
+            {
+                Name = dto.Name.Trim(),
+                Email = cleanEmail,
+                Password = dto.Password,
+                Avatar = avatar,
+                Color = color,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _db.Users.Add(newUser);
+            await _db.SaveChangesAsync();
+
+            // Mặc định đăng ký mới: Ai cũng là Thành viên
+            return Ok(new
+            {
+                success = true,
+                message = "Đăng ký tài khoản thành công!",
+                user = new
+                {
+                    id = newUser.Id.ToString(),
+                    name = newUser.Name,
+                    email = newUser.Email,
+                    avatar = newUser.Avatar,
+                    color = newUser.Color,
+                    roleType = "Member",
+                    role = "Thành viên"
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
+    }
+
+    [HttpPost("auth/login")]
+    public async Task<IActionResult> Login([FromBody] LoginDto dto)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.Password))
+            {
+                return BadRequest(new { success = false, message = "Vui lòng nhập Email và Mật khẩu." });
+            }
+
+            var cleanEmail = dto.Email.Trim().ToLowerInvariant();
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == cleanEmail);
+            if (user == null || user.Password != dto.Password)
+            {
+                return BadRequest(new { success = false, message = "Email hoặc mật khẩu không chính xác." });
+            }
+
+            // Kiểm tra xem user này có đang là trưởng nhóm của nhóm hiện tại không
+            var team = await _db.Teams.FirstOrDefaultAsync();
+            var member = await _db.Members.FirstOrDefaultAsync(m => m.Email.ToLower() == cleanEmail);
+
+            bool isLeader = false;
+            if (team != null && !string.IsNullOrEmpty(team.CreatedByEmail) && team.CreatedByEmail.ToLower() == cleanEmail)
+            {
+                isLeader = true;
+            }
+            else if (member != null && string.Equals(member.RoleType, "Leader", StringComparison.OrdinalIgnoreCase))
+            {
+                isLeader = true;
+            }
+
+            return Ok(new
+            {
+                success = true,
+                message = "Đăng nhập thành công!",
+                user = new
+                {
+                    id = user.Id.ToString(),
+                    name = user.Name,
+                    email = user.Email,
+                    avatar = user.Avatar,
+                    color = user.Color,
+                    roleType = isLeader ? "Leader" : "Member",
+                    role = isLeader ? "Trưởng nhóm" : "Thành viên"
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
+    }
+
+    [HttpPost("team/create")]
+    public async Task<IActionResult> CreateTeam([FromBody] CreateTeamDto dto)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(dto.TeamName))
+            {
+                return BadRequest(new { success = false, message = "Vui lòng nhập tên nhóm." });
+            }
+
+            var joinCode = "TF-" + Random.Shared.Next(1000, 9999).ToString();
+            var team = await _db.Teams.FirstOrDefaultAsync();
+            if (team == null)
+            {
+                team = new Team();
+                _db.Teams.Add(team);
+            }
+
+            team.Name = dto.TeamName.Trim();
+            team.Topic = dto.Topic?.Trim() ?? "";
+            team.Subject = dto.Subject?.Trim() ?? "";
+            team.ClassCode = dto.ClassCode?.Trim() ?? "";
+            team.FinalDeadline = dto.FinalDeadline?.Trim() ?? "";
+            team.CreatedByEmail = dto.UserEmail?.Trim().ToLowerInvariant() ?? "";
+            team.JoinCode = joinCode;
+
+            // Xóa các thành viên và dữ liệu cũ của nhóm trước để tạo mới sạch sẽ
+            var existingMembers = await _db.Members.Include(m => m.ScheduleSlots).ToListAsync();
+            _db.Members.RemoveRange(existingMembers);
+            _db.Tasks.RemoveRange(await _db.Tasks.ToListAsync());
+            _db.Meetings.RemoveRange(await _db.Meetings.ToListAsync());
+            _db.PeerReviews.RemoveRange(await _db.PeerReviews.ToListAsync());
+
+            // "khi thành viên muốn tạo nhóm thì phải tự tạo xong hệ thống sẽ set người đầu tiên tạo đó làm nhóm trưởng nhé"
+            var leaderMember = new TeamMember
+            {
+                Id = "m_" + Guid.NewGuid().ToString("N")[..8],
+                Name = string.IsNullOrWhiteSpace(dto.UserName) ? "Trưởng Nhóm" : dto.UserName.Trim(),
+                Email = dto.UserEmail?.Trim().ToLowerInvariant() ?? "",
+                Role = "Trưởng nhóm",
+                RoleType = "Leader", // set người đầu tiên tạo làm nhóm trưởng
+                Avatar = string.IsNullOrWhiteSpace(dto.UserName) ? "TN" : dto.UserName.Trim()[..Math.Min(2, dto.UserName.Trim().Length)].ToUpper(),
+                Color = "#059669"
+            };
+            _db.Members.Add(leaderMember);
+
+            _db.ActivityLogs.Add(new ActivityLog
+            {
+                Text = $"{leaderMember.Name} đã tạo nhóm '{team.Name}' (Mã nhóm: {joinCode}) và trở thành 👑 Nhóm Trưởng.",
+                Time = "Vừa xong",
+                Type = "team"
+            });
+
+            await _db.SaveChangesAsync();
+
+            return Ok(new
+            {
+                success = true,
+                message = $"Tạo nhóm '{team.Name}' thành công! Bạn đã là 👑 Nhóm Trưởng.",
+                joinCode = team.JoinCode,
+                team = new
+                {
+                    id = team.Id,
+                    name = team.Name,
+                    topic = team.Topic,
+                    subject = team.Subject,
+                    classCode = team.ClassCode,
+                    finalDeadline = team.FinalDeadline,
+                    joinCode = team.JoinCode,
+                    createdByEmail = team.CreatedByEmail
+                },
+                leader = new
+                {
+                    id = leaderMember.Id,
+                    name = leaderMember.Name,
+                    email = leaderMember.Email,
+                    role = leaderMember.Role,
+                    roleType = "Leader",
+                    avatar = leaderMember.Avatar,
+                    color = leaderMember.Color
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
+    }
+
+    [HttpPost("team/join")]
+    public async Task<IActionResult> JoinTeam([FromBody] JoinTeamDto dto)
+    {
+        try
+        {
+            var code = dto.JoinCode?.Trim().ToUpperInvariant();
+            var team = await _db.Teams.FirstOrDefaultAsync(t => t.JoinCode != null && t.JoinCode.ToUpper() == code);
+            if (team == null)
+            {
+                return BadRequest(new { success = false, message = "Mã nhóm không hợp lệ hoặc nhóm không tồn tại." });
+            }
+
+            var cleanEmail = dto.UserEmail?.Trim().ToLowerInvariant() ?? "";
+            var existingMember = await _db.Members.FirstOrDefaultAsync(m => m.Email.ToLower() == cleanEmail);
+            if (existingMember != null)
+            {
+                return Ok(new
+                {
+                    success = true,
+                    message = "Bạn đã có mặt trong nhóm này!",
+                    member = existingMember,
+                    roleType = existingMember.RoleType
+                });
+            }
+
+            // Ai tham gia cũng là Thành viên
+            var newMember = new TeamMember
+            {
+                Id = "m_" + Guid.NewGuid().ToString("N")[..8],
+                Name = dto.UserName.Trim(),
+                Email = cleanEmail,
+                Role = "Thành viên",
+                RoleType = "Member",
+                Avatar = dto.UserName.Trim()[..Math.Min(2, dto.UserName.Trim().Length)].ToUpper(),
+                Color = "#2563eb"
+            };
+            _db.Members.Add(newMember);
+
+            _db.ActivityLogs.Add(new ActivityLog
+            {
+                Text = $"{newMember.Name} đã tham gia vào nhóm '{team.Name}' với tư cách Thành viên.",
+                Time = "Vừa xong",
+                Type = "member"
+            });
+
+            await _db.SaveChangesAsync();
+
+            return Ok(new
+            {
+                success = true,
+                message = $"Tham gia nhóm '{team.Name}' thành công!",
+                member = newMember,
+                roleType = "Member"
+            });
         }
         catch (Exception ex)
         {
@@ -383,6 +649,37 @@ public class SyncStateDto
     public List<ActivityDto>? Activities { get; set; }
 }
 
+public class RegisterDto
+{
+    public string Name { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+}
+
+public class LoginDto
+{
+    public string Email { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+}
+
+public class CreateTeamDto
+{
+    public string UserEmail { get; set; } = string.Empty;
+    public string UserName { get; set; } = string.Empty;
+    public string TeamName { get; set; } = string.Empty;
+    public string? Topic { get; set; }
+    public string? Subject { get; set; }
+    public string? ClassCode { get; set; }
+    public string? FinalDeadline { get; set; }
+}
+
+public class JoinTeamDto
+{
+    public string UserEmail { get; set; } = string.Empty;
+    public string UserName { get; set; } = string.Empty;
+    public string JoinCode { get; set; } = string.Empty;
+}
+
 public class TeamDto
 {
     public string? Name { get; set; }
@@ -390,6 +687,8 @@ public class TeamDto
     public string? Subject { get; set; }
     public string? ClassCode { get; set; }
     public string? FinalDeadline { get; set; }
+    public string? JoinCode { get; set; }
+    public string? CreatedByEmail { get; set; }
 }
 
 public class MemberDto

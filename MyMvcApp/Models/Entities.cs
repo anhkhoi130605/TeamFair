@@ -24,11 +24,43 @@ public class Team
     [MaxLength(50)]
     public string? FinalDeadline { get; set; }
 
+    [MaxLength(50)]
+    public string? JoinCode { get; set; }
+
+    [MaxLength(200)]
+    public string? CreatedByEmail { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public List<TeamMember> Members { get; set; } = new();
     public List<TeamTask> Tasks { get; set; } = new();
     public List<TeamMeeting> Meetings { get; set; } = new();
+}
+
+public class AppUser
+{
+    [Key]
+    public int Id { get; set; }
+
+    [Required]
+    [MaxLength(150)]
+    public string Name { get; set; } = string.Empty;
+
+    [Required]
+    [MaxLength(200)]
+    public string Email { get; set; } = string.Empty;
+
+    [Required]
+    [MaxLength(200)]
+    public string Password { get; set; } = string.Empty;
+
+    [MaxLength(10)]
+    public string Avatar { get; set; } = "TV";
+
+    [MaxLength(20)]
+    public string Color { get; set; } = "#2563eb";
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
 public class TeamMember

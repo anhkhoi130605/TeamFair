@@ -19,54 +19,65 @@
         </div>
 
         <div class="d-flex align-items-center gap-2 flex-wrap mt-2 mt-md-0">
-            <!-- Team Info Badge -->
-            <div class="px-3 py-1 bg-light rounded-3 border d-flex align-items-center gap-2">
+            <!-- Team Info & Join Code Badge -->
+            <div class="px-3 py-1 bg-light rounded-3 border d-flex align-items-center gap-2" id="topTeamBadgeContainer">
                 <span class="small text-muted">Nhóm:</span>
-                <strong class="text-slate-900 small" id="topTeamName">Nhóm của tôi</strong>
+                <strong class="text-slate-900 small" id="topTeamName">Chưa có nhóm</strong>
                 <button class="btn btn-sm btn-link p-0 text-decoration-none" onclick="TeamFairApp.editTeamInfo()" title="Chỉnh sửa thông tin nhóm">✏️</button>
             </div>
+
+            <!-- Join Code Badge -->
+            <span id="topJoinCodeBadge" class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 cursor-pointer d-none" onclick="TeamFairApp.copyJoinCode()" title="Bấm để sao chép mã mời nhóm">
+                🔗 Mã: <strong id="topJoinCodeText">--</strong> 📋
+            </span>
 
             <!-- Azure SQL Live Badge -->
             <span id="dbStatusBadge" class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" style="font-size: 0.75rem;">
                 🟢 Azure SQL: Đã kết nối
             </span>
 
-            <!-- User Profile & Role Switcher -->
-            <div class="dropdown">
+            <!-- User Profile & Account Dropdown -->
+            <div class="dropdown" id="userAccountDropdown">
                 <button class="btn btn-sm btn-light border dropdown-toggle d-flex align-items-center gap-2 fw-semibold px-2 py-1" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="userRoleBtn">
-                    <span id="userAvatarBadge" class="tf-avatar" style="width: 24px; height: 24px; font-size: 0.7rem; background-color: #059669;">TN</span>
-                    <span id="userNameDisplay">Trưởng Nhóm</span>
-                    <span id="userRoleTag" class="badge bg-success" style="font-size: 0.7rem;">👑 Trưởng Nhóm</span>
+                    <span id="userAvatarBadge" class="tf-avatar" style="width: 24px; height: 24px; font-size: 0.7rem; background-color: #2563eb;">TV</span>
+                    <span id="userNameDisplay">Thành Viên</span>
+                    <span id="userRoleTag" class="badge bg-primary" style="font-size: 0.7rem;">🧑 Thành Viên</span>
                 </button>
-                <ul class="dropdown-menu dropdown-menu-end shadow-sm border p-2" style="min-width: 240px;">
+                <ul class="dropdown-menu dropdown-menu-end shadow-sm border p-2" style="min-width: 260px;">
                     <li class="p-2 border-bottom mb-2">
-                        <div class="small text-muted">Đang đăng nhập:</div>
-                        <strong class="text-slate-900" id="ddUserName">Trưởng Nhóm</strong>
-                        <div class="small text-muted" id="ddUserRole">Vai trò: Nhóm Trưởng (Leader)</div>
+                        <div class="small text-muted">Tài khoản đăng nhập:</div>
+                        <strong class="text-slate-900" id="ddUserName">Thành Viên</strong>
+                        <div class="small text-muted text-truncate" id="ddUserEmail">email@student.edu.vn</div>
+                        <div class="small mt-1" id="ddUserRole">Vai trò: <span class="badge bg-primary" id="ddRoleBadge">Thành Viên</span></div>
                     </li>
                     <li>
-                        <a class="dropdown-item rounded-2 py-2 small d-flex align-items-center gap-2" href="javascript:void(0)" onclick="TeamFairApp.switchRoleQuick('Leader')">
-                            <span>👑</span>
-                            <span>Đổi sang: <strong>Nhóm Trưởng</strong></span>
+                        <a class="dropdown-item rounded-2 py-2 small d-flex align-items-center gap-2 text-success fw-semibold" href="javascript:void(0)" onclick="TeamFairApp.openCreateTeamModal()">
+                            <span>➕</span>
+                            <span>Tạo nhóm mới <em>(Làm Nhóm Trưởng 👑)</em></span>
                         </a>
                     </li>
                     <li>
-                        <a class="dropdown-item rounded-2 py-2 small d-flex align-items-center gap-2" href="javascript:void(0)" onclick="TeamFairApp.openMemberSelectModal()">
-                            <span>🧑</span>
-                            <span>Đổi sang: <strong>Thành Viên</strong></span>
+                        <a class="dropdown-item rounded-2 py-2 small d-flex align-items-center gap-2 text-primary" href="javascript:void(0)" onclick="TeamFairApp.openJoinTeamModal()">
+                            <span>🔗</span>
+                            <span>Tham gia nhóm khác <em>(Bằng Mã Mời)</em></span>
                         </a>
                     </li>
                     <li><hr class="dropdown-divider"></li>
                     <li>
-                        <a class="dropdown-item rounded-2 py-2 small d-flex align-items-center gap-2 text-primary" href="javascript:void(0)" onclick="TeamFairApp.openLoginModal()">
-                            <span>🔑</span>
-                            <span>Hộp thoại Đăng Nhập / Phân Quyền</span>
+                        <a class="dropdown-item rounded-2 py-2 small d-flex align-items-center gap-2 text-danger" href="javascript:void(0)" onclick="TeamFairApp.logout()">
+                            <span>🚪</span>
+                            <span>Đăng xuất tài khoản</span>
                         </a>
                     </li>
                 </ul>
             </div>
 
-            <button class="btn btn-sm btn-outline-danger" onclick="TeamFairApp.clearAllData()" title="Xóa toàn bộ dữ liệu để nhập lại từ đầu">
+            <!-- Login / Register button when not logged in -->
+            <button class="btn btn-sm btn-primary d-none fw-semibold" id="btnHeaderLogin" onclick="TeamFairApp.showAuthPortal()">
+                🔑 Đăng Nhập / Đăng Ký
+            </button>
+
+            <button class="btn btn-sm btn-outline-danger" onclick="TeamFairApp.clearAllData()" title="Xóa toàn bộ dữ liệu database để bắt đầu sạch sẽ">
                 🗑️ Xóa làm mới
             </button>
             <button class="btn btn-sm btn-tf-primary text-white" onclick="TeamFairApp.switchTab('report')">
@@ -75,62 +86,207 @@
         </div>
     </header>
 
-    <!-- Main Navigation Tabs -->
-    <nav class="tf-nav-tabs mb-4">
-        <button class="tf-tab-btn active" data-tab="dashboard">
-            <span>📊</span>
-            <span id="tabDashboardTitle">Dashboard Nhóm Trưởng</span>
-        </button>
-        <button class="tf-tab-btn" data-tab="tasks">
-            <span>📋</span>
-            <span>Phân Chia Công Việc</span>
-            <span class="badge bg-primary" id="badge-task-count">0/0</span>
-        </button>
-        <button class="tf-tab-btn" data-tab="schedule">
-            <span>🗓️</span>
-            <span>Lịch Rảnh Nhóm</span>
-        </button>
-        <button class="tf-tab-btn" data-tab="meeting">
-            <span>📹</span>
-            <span>Phòng Họp Ảo</span>
-        </button>
-        <button class="tf-tab-btn" data-tab="reviews">
-            <span>⭐</span>
-            <span>Đánh Giá Chéo</span>
-        </button>
-        <button class="tf-tab-btn" data-tab="emails">
-            <span>✉️</span>
-            <span>Thông Báo & Email</span>
-            <span class="badge bg-danger" id="badge-email-count">0</span>
-        </button>
-        <button class="tf-tab-btn" data-tab="report">
-            <span>📑</span>
-            <span>Báo Cáo Nộp Bài</span>
-        </button>
-    </nav>
+    <!-- AUTH PORTAL VIEW (SHOWN WHEN USER IS NOT LOGGED IN) -->
+    <div class="tf-auth-card d-none" id="authPortalView">
+        <div class="tf-auth-header">
+            <div style="font-size: 2.5rem; line-height: 1;" class="mb-2">🤝</div>
+            <h4 class="fw-bold mb-1">Hệ Thống Phân Quyền & Quản Trị Nhóm TeamFair</h4>
+            <div class="small opacity-90">Lưu trữ tài khoản & dữ liệu thực tế trên Azure SQL Database</div>
+        </div>
+        <div class="tf-auth-tabs">
+            <button class="tf-auth-tab-btn active" id="btnAuthTabLogin" type="button" onclick="TeamFairApp.switchAuthTab('login')">🔑 Đăng Nhập</button>
+            <button class="tf-auth-tab-btn" id="btnAuthTabRegister" type="button" onclick="TeamFairApp.switchAuthTab('register')">✨ Tạo Tài Khoản Mới</button>
+        </div>
+        <div class="p-4">
+            <!-- Form 1: Login -->
+            <form id="formUserLogin" onsubmit="event.preventDefault(); TeamFairApp.handleUserLogin();">
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold text-slate-700">Email tài khoản:</label>
+                    <input type="email" id="inputLoginEmail" class="form-control" placeholder="VD: an.nguyen@student.edu.vn" required />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold text-slate-700">Mật khẩu:</label>
+                    <input type="password" id="inputLoginPassword" class="form-control" placeholder="Nhập mật khẩu của bạn..." required />
+                </div>
+                <div class="p-2 mb-3 bg-light rounded-3 border small text-muted">
+                    📌 <em>Quy tắc phân quyền: Khi đăng nhập, ai cũng là <strong>Thành Viên</strong>. Khi bạn tự tạo nhóm mới, hệ thống sẽ set bạn làm <strong>Nhóm Trưởng</strong>!</em>
+                </div>
+                <button type="submit" class="btn btn-tf-primary text-white w-100 fw-bold py-2">
+                    🔑 Đăng Nhập
+                </button>
+                <div class="text-center mt-3">
+                    <span class="small text-muted">Chưa có tài khoản? </span>
+                    <button type="button" class="btn btn-link p-0 small fw-semibold" onclick="TeamFairApp.switchAuthTab('register')">Đăng ký tài khoản mới</button>
+                </div>
+            </form>
 
-    <!-- TAB 1: DASHBOARDS (2 DISTINCT DASHBOARDS) -->
-    <div class="tf-tab-pane" id="pane-dashboard">
-        <!-- Role Indicator Banner -->
-        <div class="alert d-flex flex-wrap align-items-center justify-content-between p-3 mb-4 rounded-3 shadow-sm" id="roleBanner" style="background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%); border: 1px solid #bbf7d0;">
-            <div class="d-flex align-items-center gap-3">
-                <span class="fs-3" id="roleBannerIcon">👑</span>
-                <div>
-                    <h6 class="fw-bold text-slate-900 mb-0" id="roleBannerTitle">Bảng Điều Khiển Quản Trị - Nhóm Trưởng</h6>
-                    <div class="small text-slate-600 mt-1" id="roleBannerDesc">
-                        Bạn đang có quyền quản trị toàn diện: theo dõi chỉ số công bằng nhóm, giao việc, duyệt tiến độ và nhắc nhở thành viên.
+            <!-- Form 2: Register -->
+            <form id="formUserRegister" class="d-none" onsubmit="event.preventDefault(); TeamFairApp.handleUserRegister();">
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold text-slate-700">Họ và Tên đầy đủ:</label>
+                    <input type="text" id="inputRegName" class="form-control" placeholder="VD: Nguyễn Văn An" required />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold text-slate-700">Email sinh viên / cá nhân:</label>
+                    <input type="email" id="inputRegEmail" class="form-control" placeholder="VD: an.nguyen@student.edu.vn" required />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold text-slate-700">Mật khẩu:</label>
+                    <input type="password" id="inputRegPassword" class="form-control" placeholder="Mật khẩu tối thiểu 6 ký tự..." minlength="6" required />
+                </div>
+                <div class="p-2 mb-3 bg-light rounded-3 border small text-muted">
+                    ✓ Dữ liệu tài khoản được lưu thật sự vào Azure SQL Database.<br>
+                    ✓ Bạn có thể tự tạo nhóm mới để làm Nhóm Trưởng hoặc tham gia nhóm bạn bè.
+                </div>
+                <button type="submit" class="btn btn-tf-primary text-white w-100 fw-bold py-2">
+                    ✨ Hoàn Tất Tạo Tài Khoản
+                </button>
+                <div class="text-center mt-3">
+                    <span class="small text-muted">Đã có tài khoản rồi? </span>
+                    <button type="button" class="btn btn-link p-0 small fw-semibold" onclick="TeamFairApp.switchAuthTab('login')">Quay lại Đăng nhập</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MAIN APP WORKSPACE VIEW (SHOWN WHEN USER IS LOGGED IN) -->
+    <div id="mainAppWorkspaceView">
+        <!-- Main Navigation Tabs - Fixed into 1 Single Line Row -->
+        <nav class="tf-nav-tabs mb-4">
+            <button class="tf-tab-btn active" data-tab="dashboard">
+                <span>📊</span>
+                <span id="tabDashboardTitle">Dashboard</span>
+            </button>
+            <button class="tf-tab-btn" data-tab="tasks">
+                <span>📋</span>
+                <span>Phân Chia Công Việc</span>
+                <span class="badge bg-primary" id="badge-task-count">0/0</span>
+            </button>
+            <button class="tf-tab-btn" data-tab="schedule">
+                <span>🗓️</span>
+                <span>Lịch Rảnh Nhóm</span>
+            </button>
+            <button class="tf-tab-btn" data-tab="meeting">
+                <span>📹</span>
+                <span>Phòng Họp Ảo</span>
+            </button>
+            <button class="tf-tab-btn" data-tab="reviews">
+                <span>⭐</span>
+                <span>Đánh Giá Chéo</span>
+            </button>
+            <button class="tf-tab-btn" data-tab="emails">
+                <span>✉️</span>
+                <span>Thông Báo & Email</span>
+                <span class="badge bg-danger" id="badge-email-count">0</span>
+            </button>
+            <button class="tf-tab-btn" data-tab="report">
+                <span>📑</span>
+                <span>Báo Cáo Nộp Bài</span>
+            </button>
+        </nav>
+
+        <!-- TAB 1: DASHBOARDS (2 DISTINCT DASHBOARDS) -->
+        <div class="tf-tab-pane" id="pane-dashboard">
+            <!-- ONBOARDING HUB VIEW (SHOWN WHEN NO TEAM HAS BEEN CREATED YET) -->
+            <div id="teamHubView" class="mb-4 d-none">
+                <div class="p-4 bg-white rounded-4 border shadow-sm mb-4 text-center">
+                    <h4 class="fw-bold text-slate-900 mb-1">Xin chào, <span id="hubGreetingName">Bạn</span>! 👋</h4>
+                    <div class="text-muted">Bạn hiện đang có vai trò <strong>🧑 Thành Viên</strong>. Để bắt đầu làm việc, hãy chọn một trong hai lựa chọn bên dưới:</div>
+                </div>
+                <div class="row g-4">
+                    <!-- Option 1: Create New Team -->
+                    <div class="col-lg-7">
+                        <div class="tf-team-hub-card">
+                            <div class="d-flex align-items-center gap-3 mb-3">
+                                <span class="fs-1">👑</span>
+                                <div>
+                                    <h5 class="fw-bold text-slate-900 mb-1">Tạo Nhóm Mới (Bạn sẽ là Nhóm Trưởng)</h5>
+                                    <div class="text-muted small">Hệ thống sẽ chỉ định bạn làm Nhóm Trưởng toàn quyền quản trị và cấp Mã Nhóm mời bạn bè.</div>
+                                </div>
+                            </div>
+                            <form id="formHubCreateTeam" onsubmit="event.preventDefault(); TeamFairApp.handleCreateTeamHub();">
+                                <div class="mb-3">
+                                    <label class="form-label small fw-semibold text-slate-700">Tên nhóm:</label>
+                                    <input type="text" id="hubTeamName" class="form-control" placeholder="VD: Nhóm 05 - KTPM" required />
+                                </div>
+                                <div class="row g-2 mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-semibold text-slate-700">Tên đề tài / Đồ án:</label>
+                                        <input type="text" id="hubTeamTopic" class="form-control" placeholder="VD: Nền tảng quản trị phân công nhóm" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-semibold text-slate-700">Môn học:</label>
+                                        <input type="text" id="hubTeamSubject" class="form-control" placeholder="VD: Công nghệ phần mềm" />
+                                    </div>
+                                </div>
+                                <div class="row g-2 mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-semibold text-slate-700">Mã lớp / Giảng viên:</label>
+                                        <input type="text" id="hubTeamClass" class="form-control" placeholder="VD: 21CNTT01 - ThS. Minh" />
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-semibold text-slate-700">Hạn chót cuối kỳ:</label>
+                                        <input type="date" id="hubTeamDeadline" class="form-control" />
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-tf-primary text-white w-100 fw-bold py-2">
+                                    🚀 Tạo Nhóm Mới & Trở Thành Nhóm Trưởng
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Option 2: Join Existing Team -->
+                    <div class="col-lg-5">
+                        <div class="tf-team-hub-card">
+                            <div class="d-flex align-items-center gap-3 mb-3">
+                                <span class="fs-1">🧑</span>
+                                <div>
+                                    <h5 class="fw-bold text-slate-900 mb-1">Tham Gia Nhóm (Vai trò Thành Viên)</h5>
+                                    <div class="text-muted small">Nhập mã nhóm do Nhóm Trưởng cung cấp (VD: TF-1234).</div>
+                                </div>
+                            </div>
+                            <form id="formHubJoinTeam" onsubmit="event.preventDefault(); TeamFairApp.handleJoinTeamHub();">
+                                <div class="mb-3">
+                                    <label class="form-label small fw-semibold text-slate-700">Mã nhóm mời (Join Code):</label>
+                                    <input type="text" id="hubJoinCode" class="form-control text-uppercase fw-bold text-center" style="font-size: 1.25rem; letter-spacing: 2px;" placeholder="TF-xxxx" required />
+                                </div>
+                                <div class="p-3 bg-light rounded-3 small text-muted mb-4 border">
+                                    ✓ Tham gia với tư cách <strong>Thành viên</strong>.<br>
+                                    ✓ Nhận phân công nhiệm vụ, cập nhật tiến độ công việc và đánh giá chéo đồng đội.
+                                </div>
+                                <button type="submit" class="btn btn-outline-primary w-100 fw-bold py-2">
+                                    🤝 Tham Gia Nhóm
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="mt-2 mt-md-0 d-flex gap-2">
-                <button class="btn btn-sm btn-outline-primary fw-semibold" id="btnSwitchOtherRole" onclick="TeamFairApp.toggleCurrentRole()">
-                    🧑 Chuyển sang xem giao diện Thành Viên
-                </button>
-                <button class="btn btn-sm btn-light border fw-semibold" onclick="TeamFairApp.openLoginModal()">
-                    🔑 Đăng nhập tài khoản khác
-                </button>
+
+            <!-- Role Indicator Banner (Active Team) -->
+            <div class="alert d-flex flex-wrap align-items-center justify-content-between p-3 mb-4 rounded-3 shadow-sm" id="roleBanner" style="background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%); border: 1px solid #bbf7d0;">
+                <div class="d-flex align-items-center gap-3">
+                    <span class="fs-3" id="roleBannerIcon">👑</span>
+                    <div>
+                        <h6 class="fw-bold text-slate-900 mb-0" id="roleBannerTitle">Bảng Điều Khiển Quản Trị - Nhóm Trưởng</h6>
+                        <div class="small text-slate-600 mt-1" id="roleBannerDesc">
+                            Bạn đang có quyền quản trị toàn diện: theo dõi chỉ số công bằng nhóm, giao việc, duyệt tiến độ và nhắc nhở thành viên.
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-2 mt-md-0 d-flex gap-2 align-items-center">
+                    <span id="bannerJoinCodeDisplay" class="badge bg-white text-primary border shadow-sm px-3 py-2 small fw-semibold">
+                        Mã mời nhóm: <strong id="bannerJoinCodeText">TF-xxxx</strong>
+                    </span>
+                    <button class="btn btn-sm btn-outline-success fw-semibold" onclick="TeamFairApp.openCreateTeamModal()">
+                        ➕ Tạo nhóm khác
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary fw-semibold" id="btnSwitchOtherRole" onclick="TeamFairApp.toggleCurrentRole()">
+                        🧑 Xem giao diện Thành Viên
+                    </button>
+                </div>
             </div>
-        </div>
 
         <!-- ==================== DASHBOARD 1: LEADER VIEW ==================== -->
         <div id="dash-leader-view">
@@ -760,12 +916,89 @@
                 </div>
             </div>
         </div>
-    </div>
+    </div> <!-- /mainAppWorkspaceView -->
 
     <!-- Footer matching user's original design -->
     <footer class="text-center text-muted small py-4 mt-3">
-        TeamFair — Prototype cho buổi demo trước lớp
+        TeamFair — Nền tảng phân chia & đánh giá đóng góp nhóm công bằng
     </footer>
+</div>
+
+<!-- ==================== MODAL: TẠO NHÓM MỚI (NHÓM TRƯỞNG) ==================== -->
+<div class="modal fade" id="modalCreateTeam" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-success text-white">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-4">👑</span>
+                    <h5 class="modal-title fw-bold mb-0">Tạo Nhóm Mới (Làm Nhóm Trưởng)</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="formModalCreateTeam" onsubmit="event.preventDefault(); TeamFairApp.handleModalCreateTeam();">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-slate-700">Tên nhóm:</label>
+                        <input type="text" id="modalTeamName" class="form-control" placeholder="VD: Nhóm 01 - Đồ án tốt nghiệp" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-slate-700">Tên đề tài / Đồ án:</label>
+                        <input type="text" id="modalTeamTopic" class="form-control" placeholder="VD: Ứng dụng đo đóng góp nhóm tự động" />
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label small fw-semibold text-slate-700">Môn học:</label>
+                            <input type="text" id="modalTeamSubject" class="form-control" placeholder="VD: Công nghệ phần mềm" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-semibold text-slate-700">Mã lớp / Giảng viên:</label>
+                            <input type="text" id="modalTeamClass" class="form-control" placeholder="VD: 21CNTT - ThS. Nam" />
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-slate-700">Hạn chót cuối kỳ:</label>
+                        <input type="date" id="modalTeamDeadline" class="form-control" />
+                    </div>
+                    <div class="p-2 mb-3 bg-light rounded-3 border small text-muted">
+                        💡 <em>Khi bạn tạo nhóm này, hệ thống sẽ tự động gán bạn làm <strong>👑 Nhóm Trưởng</strong> và sinh mã nhóm để các thành viên khác tham gia.</em>
+                    </div>
+                    <button type="submit" class="btn btn-tf-primary text-white w-100 fw-bold py-2">
+                        🚀 Khởi Tạo Nhóm Ngay
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== MODAL: THAM GIA NHÓM (THÀNH VIÊN) ==================== -->
+<div class="modal fade" id="modalJoinTeam" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-primary text-white">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-4">🤝</span>
+                    <h5 class="modal-title fw-bold mb-0">Tham Gia Nhóm (Vai trò Thành Viên)</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="formModalJoinTeam" onsubmit="event.preventDefault(); TeamFairApp.handleModalJoinTeam();">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-slate-700">Nhập mã nhóm do Nhóm Trưởng cung cấp:</label>
+                        <input type="text" id="modalJoinCodeInput" class="form-control text-uppercase fw-bold text-center" style="font-size: 1.25rem; letter-spacing: 2px;" placeholder="TF-xxxx" required />
+                    </div>
+                    <div class="p-2 mb-3 bg-light rounded-3 border small text-muted">
+                        ✓ Bạn sẽ vào nhóm với tư cách <strong>🧑 Thành viên</strong>.<br>
+                        ✓ Dữ liệu công việc & đánh giá chéo sẽ đồng bộ trên Azure SQL.
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 fw-bold py-2">
+                        🔗 Tham Gia Nhóm
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- ==================== MODAL: ĐĂNG NHẬP / CHUYỂN VAI TRÒ ==================== -->

@@ -83,24 +83,36 @@ body {
   box-shadow: 0 2px 4px rgba(30, 64, 175, 0.25);
 }
 
-/* Navigation Tabs Bar */
+/* Navigation Tabs Bar - Fixed in 1 Single Horizontal Row */
 .tf-nav-tabs {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  padding: 0.5rem;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 0.35rem;
+  padding: 0.4rem;
   background: #ffffff;
   border: 1px solid var(--tf-slate-200);
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+  align-items: center;
+}
+
+.tf-nav-tabs::-webkit-scrollbar {
+  height: 4px;
+}
+.tf-nav-tabs::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
 }
 
 .tf-tab-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.6rem 1.1rem;
-  font-size: 0.925rem;
+  gap: 0.4rem;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.86rem;
   font-weight: 600;
   color: var(--tf-slate-600);
   background: transparent;
@@ -108,6 +120,8 @@ body {
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .tf-tab-btn:hover {
@@ -125,6 +139,62 @@ body {
   font-size: 0.725rem;
   border-radius: 9999px;
   padding: 0.2rem 0.5rem;
+}
+
+/* Auth Portal & Onboarding Card Styling */
+.tf-auth-card {
+  max-width: 480px;
+  margin: 3rem auto;
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid var(--tf-slate-200);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+
+.tf-auth-header {
+  background: linear-gradient(135deg, #059669 0%, #0d9488 100%);
+  color: #ffffff;
+  padding: 2rem 1.5rem;
+  text-align: center;
+}
+
+.tf-auth-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--tf-slate-200);
+  background: #f8fafc;
+}
+
+.tf-auth-tab-btn {
+  flex: 1;
+  padding: 0.85rem 1rem;
+  border: none;
+  background: transparent;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--tf-slate-500);
+  transition: all 0.2s;
+  border-bottom: 2px solid transparent;
+}
+
+.tf-auth-tab-btn.active {
+  color: #059669;
+  background: #ffffff;
+  border-bottom-color: #059669;
+}
+
+.tf-team-hub-card {
+  border: 2px dashed #cbd5e1;
+  border-radius: 16px;
+  padding: 1.75rem;
+  background: #ffffff;
+  transition: all 0.2s ease;
+  height: 100%;
+}
+
+.tf-team-hub-card:hover {
+  border-color: #059669;
+  box-shadow: 0 8px 20px rgba(5, 150, 105, 0.08);
 }
 
 /* Buttons */

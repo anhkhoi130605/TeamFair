@@ -9,6 +9,7 @@ public class AppDbContext : DbContext
     {
     }
 
+    public DbSet<AppUser> Users => Set<AppUser>();
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<TeamMember> Members => Set<TeamMember>();
     public DbSet<TeamTask> Tasks => Set<TeamTask>();
@@ -21,6 +22,13 @@ public class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<AppUser>(entity =>
+        {
+            entity.ToTable("Users");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Email).IsUnique();
+        });
 
         modelBuilder.Entity<Team>(entity =>
         {

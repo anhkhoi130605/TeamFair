@@ -57,17 +57,20 @@ const TeamFairApp = {
       if (savedUser) {
         this.currentUser = JSON.parse(savedUser);
       } else {
-        this.currentUser = { ...DEFAULT_LEADER };
-        this.saveUserSession();
+        this.currentUser = null;
       }
     } catch (e) {
-      this.currentUser = { ...DEFAULT_LEADER };
+      this.currentUser = null;
     }
   },
 
   saveUserSession() {
     try {
-      localStorage.setItem("TeamFair_CurrentUser_v1", JSON.stringify(this.currentUser));
+      if (this.currentUser) {
+        localStorage.setItem("TeamFair_CurrentUser_v1", JSON.stringify(this.currentUser));
+      } else {
+        localStorage.removeItem("TeamFair_CurrentUser_v1");
+      }
     } catch (e) {
       console.error("Lỗi lưu session user:", e);
     }
@@ -215,150 +218,256 @@ const TeamFairApp = {
     }
   },
 
-  /* ================= ROLE & AUTH CONTROLS ================= */
-  openLoginModal() {
-    this.populateMemberSelectInLoginModal();
-    this.selectRoleCard(this.currentUser.roleType || "Leader");
-    const modal = new bootstrap.Modal(document.getElementById("loginModal"));
-    modal.show();
-  },
+  /* ================= REAL AUTHENTICATION & TEAM MANAGEMENT ================= */
+  switchAuthTab(tab) {
+    const btnLogin = document.getElementById("btnAuthTabLogin");
+    const btnRegister = document.getElementById("btnAuthTabRegister");
+    const formLogin = document.getElementById("formUserLogin");
+    const formRegister = document.getElementById("formUserRegister");
 
-  openMemberSelectModal() {
-    this.openLoginModal();
-    this.selectRoleCard("Member");
-  },
-
-  populateMemberSelectInLoginModal() {
-    const sel = document.getElementById("loginMemberSelect");
-    if (!sel) return;
-
-    if (!this.state.members.length) {
-      sel.innerHTML = `<option value="">-- Chưa có thành viên nào trong nhóm --</option>`;
-      return;
-    }
-
-    sel.innerHTML = this.state.members.map(m => `
-      <option value="${m.id}" ${this.currentUser && this.currentUser.id === m.id ? 'selected' : ''}>
-        ${m.name} (${m.email || 'Thành viên'})
-      </option>
-    `).join("");
-  },
-
-  selectRoleCard(roleType) {
-    this.selectedQuickRole = roleType;
-    const cardLeader = document.getElementById("roleCardLeader");
-    const cardMember = document.getElementById("roleCardMember");
-
-    if (cardLeader) cardLeader.classList.toggle("selected", roleType === "Leader");
-    if (cardMember) cardMember.classList.toggle("selected", roleType === "Member");
-  },
-
-  confirmQuickRole() {
-    if (this.selectedQuickRole === "Leader") {
-      // Find designated leader member or use default leader
-      const leaderMember = this.state.members.find(m => m.roleType === "Leader" || (m.role && m.role.toLowerCase().includes("trưởng")));
-      if (leaderMember) {
-        this.currentUser = { ...leaderMember, roleType: "Leader" };
-      } else {
-        this.currentUser = { ...DEFAULT_LEADER };
-      }
-      this.saveUserSession();
-      this.showToast("Đã đăng nhập vai trò: 👑 Nhóm Trưởng (Leader)!", "success");
+    if (tab === "login") {
+      btnLogin?.classList.add("active");
+      btnRegister?.classList.remove("active");
+      formLogin?.classList.remove("d-none");
+      formRegister?.classList.add("d-none");
     } else {
-      const selMemberId = document.getElementById("loginMemberSelect")?.value;
-      const member = this.state.members.find(m => m.id === selMemberId);
-      if (!member) {
-        if (!this.state.members.length) {
-          alert("Nhóm chưa có thành viên nào! Vui lòng vào vai trò Nhóm Trưởng để thêm thành viên trước.");
-          return;
-        }
-        this.currentUser = { ...this.state.members[0], roleType: "Member" };
-      } else {
-        this.currentUser = { ...member, roleType: "Member" };
-      }
-      this.saveUserSession();
-      this.showToast(`Đã đăng nhập vai trò: 🧑 Thành viên (${this.currentUser.name})!`, "success");
+      btnLogin?.classList.remove("active");
+      btnRegister?.classList.add("active");
+      formLogin?.classList.add("d-none");
+      formRegister?.classList.remove("d-none");
     }
+  },
 
-    const modalEl = document.getElementById("loginModal");
-    const modal = bootstrap.Modal.getInstance(modalEl);
-    if (modal) modal.hide();
-
+  showAuthPortal() {
+    this.currentUser = null;
+    this.saveUserSession();
     this.renderAll();
   },
 
-  switchRoleQuick(roleType) {
-    if (roleType === "Leader") {
-      const leaderMember = this.state.members.find(m => m.roleType === "Leader" || (m.role && m.role.toLowerCase().includes("trưởng")));
-      this.currentUser = leaderMember ? { ...leaderMember, roleType: "Leader" } : { ...DEFAULT_LEADER };
-      this.saveUserSession();
-      this.renderAll();
-      this.showToast("Đã chuyển sang Dashboard 👑 Nhóm Trưởng!", "success");
-    } else {
-      if (!this.state.members.length) {
-        alert("Chưa có thành viên nào trong nhóm! Hãy thêm thành viên trước khi đổi sang vai trò Thành viên.");
+  async handleUserRegister() {
+    const name = document.getElementById("inputRegName")?.value.trim();
+    const email = document.getElementById("inputRegEmail")?.value.trim();
+    const password = document.getElementById("inputRegPassword")?.value.trim();
+
+    if (!name || !email || !password) {
+      alert("Vui lòng nhập đầy đủ thông tin Họ tên, Email và Mật khẩu!");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        alert(data.message || "Đăng ký không thành công!");
         return;
       }
-      this.currentUser = { ...this.state.members[0], roleType: "Member" };
+
+      this.currentUser = data.user;
       this.saveUserSession();
+      await this.loadState();
       this.renderAll();
-      this.showToast(`Đã chuyển sang Dashboard 🧑 Thành viên (${this.currentUser.name})!`, "success");
+      this.showToast(`Chào mừng ${data.user.name}! Bạn hiện là 🧑 Thành viên. Hãy tự tạo nhóm nếu muốn làm Nhóm Trưởng nhé!`, "success");
+    } catch (err) {
+      console.error("Lỗi đăng ký:", err);
+      alert("Lỗi kết nối đến máy chủ. Vui lòng thử lại!");
+    }
+  },
+
+  async handleUserLogin() {
+    const email = document.getElementById("inputLoginEmail")?.value.trim();
+    const password = document.getElementById("inputLoginPassword")?.value.trim();
+
+    if (!email || !password) {
+      alert("Vui lòng nhập Email và Mật khẩu!");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        alert(data.message || "Đăng nhập không thành công!");
+        return;
+      }
+
+      this.currentUser = data.user;
+      this.saveUserSession();
+      await this.loadState();
+      this.renderAll();
+      this.showToast(`Đăng nhập thành công! Vai trò: ${data.user.roleType === 'Leader' ? '👑 Nhóm Trưởng' : '🧑 Thành Viên'}`, "success");
+    } catch (err) {
+      console.error("Lỗi đăng nhập:", err);
+      alert("Lỗi kết nối đến máy chủ. Vui lòng thử lại!");
+    }
+  },
+
+  logout() {
+    this.currentUser = null;
+    this.saveUserSession();
+    this.renderAll();
+    this.showToast("Đã đăng xuất tài khoản.", "info");
+  },
+
+  openCreateTeamModal() {
+    const modalEl = document.getElementById("modalCreateTeam");
+    if (modalEl) {
+      const modal = new bootstrap.Modal(modalEl);
+      modal.show();
+    }
+  },
+
+  openJoinTeamModal() {
+    const modalEl = document.getElementById("modalJoinTeam");
+    if (modalEl) {
+      const modal = new bootstrap.Modal(modalEl);
+      modal.show();
+    }
+  },
+
+  async handleCreateTeamHub() {
+    const teamName = document.getElementById("hubTeamName")?.value.trim();
+    const topic = document.getElementById("hubTeamTopic")?.value.trim();
+    const subject = document.getElementById("hubTeamSubject")?.value.trim();
+    const classCode = document.getElementById("hubTeamClass")?.value.trim();
+    const finalDeadline = document.getElementById("hubTeamDeadline")?.value;
+
+    await this.executeCreateTeam({ teamName, topic, subject, classCode, finalDeadline });
+  },
+
+  async handleModalCreateTeam() {
+    const teamName = document.getElementById("modalTeamName")?.value.trim();
+    const topic = document.getElementById("modalTeamTopic")?.value.trim();
+    const subject = document.getElementById("modalTeamSubject")?.value.trim();
+    const classCode = document.getElementById("modalTeamClass")?.value.trim();
+    const finalDeadline = document.getElementById("modalTeamDeadline")?.value;
+
+    const modalEl = document.getElementById("modalCreateTeam");
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    if (modal) modal.hide();
+
+    await this.executeCreateTeam({ teamName, topic, subject, classCode, finalDeadline });
+  },
+
+  async executeCreateTeam(teamData) {
+    if (!this.currentUser) {
+      alert("Vui lòng đăng nhập trước khi tạo nhóm!");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/team/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userEmail: this.currentUser.email,
+          userName: this.currentUser.name,
+          ...teamData
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        alert(data.message || "Tạo nhóm thất bại!");
+        return;
+      }
+
+      // Người tạo nhóm tự động được gán làm Nhóm Trưởng!
+      this.currentUser.roleType = "Leader";
+      this.currentUser.role = "Trưởng nhóm";
+      this.saveUserSession();
+
+      await this.loadState();
+      this.renderAll();
+      this.showToast(`🎉 Tạo nhóm thành công! Bạn đã là 👑 Nhóm Trưởng (Mã nhóm: ${data.joinCode})`, "success");
+    } catch (err) {
+      console.error("Lỗi tạo nhóm:", err);
+      alert("Lỗi kết nối khi tạo nhóm!");
+    }
+  },
+
+  async handleJoinTeamHub() {
+    const joinCode = document.getElementById("hubJoinCode")?.value.trim();
+    await this.executeJoinTeam(joinCode);
+  },
+
+  async handleModalJoinTeam() {
+    const joinCode = document.getElementById("modalJoinCodeInput")?.value.trim();
+    const modalEl = document.getElementById("modalJoinTeam");
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    if (modal) modal.hide();
+
+    await this.executeJoinTeam(joinCode);
+  },
+
+  async executeJoinTeam(joinCode) {
+    if (!this.currentUser) {
+      alert("Vui lòng đăng nhập trước khi tham gia nhóm!");
+      return;
+    }
+    if (!joinCode) {
+      alert("Vui lòng nhập mã nhóm!");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/team/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userEmail: this.currentUser.email,
+          userName: this.currentUser.name,
+          joinCode
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        alert(data.message || "Không thể tham gia nhóm!");
+        return;
+      }
+
+      // Khi tham gia thì là Thành viên
+      this.currentUser.roleType = "Member";
+      this.currentUser.role = "Thành viên";
+      this.saveUserSession();
+
+      await this.loadState();
+      this.renderAll();
+      this.showToast("Tham gia nhóm thành công với vai trò 🧑 Thành Viên!", "success");
+    } catch (err) {
+      console.error("Lỗi tham gia nhóm:", err);
+      alert("Lỗi kết nối khi tham gia nhóm!");
+    }
+  },
+
+  copyJoinCode() {
+    const code = this.state.team?.joinCode || document.getElementById("topJoinCodeText")?.textContent;
+    if (code && code !== "--") {
+      navigator.clipboard.writeText(code).then(() => {
+        this.showToast(`Đã sao chép mã mời nhóm: ${code}! Hãy gửi cho bạn bè để vào nhóm.`, "success");
+      }).catch(() => {
+        prompt("Mã mời nhóm của bạn (hãy sao chép):", code);
+      });
+    } else {
+      alert("Chưa có mã nhóm!");
     }
   },
 
   toggleCurrentRole() {
     if (this.currentUser.roleType === "Leader") {
-      this.switchRoleQuick("Member");
+      this.currentUser.roleType = "Member";
+      this.showToast("Đang xem dưới góc nhìn 🧑 Thành Viên.", "info");
     } else {
-      this.switchRoleQuick("Leader");
+      this.currentUser.roleType = "Leader";
+      this.showToast("Đang xem dưới góc nhìn 👑 Nhóm Trưởng.", "info");
     }
-  },
-
-  handleEmailLogin() {
-    const input = document.getElementById("loginEmailInput")?.value.trim();
-    const pass = document.getElementById("loginPasswordInput")?.value.trim();
-
-    if (!input) {
-      alert("Vui lòng nhập Email hoặc Họ tên!");
-      return;
-    }
-
-    // Match against members
-    const matched = this.state.members.find(m => 
-      m.email.toLowerCase() === input.toLowerCase() || 
-      m.name.toLowerCase() === input.toLowerCase()
-    );
-
-    if (matched) {
-      const isLeader = matched.roleType === "Leader" || (matched.role && matched.role.toLowerCase().includes("trưởng"));
-      this.currentUser = { ...matched, roleType: isLeader ? "Leader" : "Member" };
-      this.saveUserSession();
-      this.showToast(`Đăng nhập thành công: ${matched.name} (${this.currentUser.roleType})`, "success");
-    } else {
-      // Allow leader login
-      if (input.toLowerCase().includes("truong") || input.toLowerCase().includes("admin") || input.toLowerCase().includes("leader")) {
-        this.currentUser = { ...DEFAULT_LEADER, name: input };
-        this.saveUserSession();
-        this.showToast("Đăng nhập thành công với vai trò 👑 Nhóm Trưởng!", "success");
-      } else {
-        alert("Không tìm thấy thành viên phù hợp trong nhóm. Đang chuyển sang vai trò Thành viên mới.");
-        this.currentUser = {
-          id: "m_guest_" + Date.now(),
-          name: input,
-          email: input.includes("@") ? input : `${input.toLowerCase().replace(/\s+/g, '')}@student.edu.vn`,
-          role: "Thành viên",
-          roleType: "Member",
-          avatar: input.substring(0, 2).toUpperCase(),
-          color: "#2563eb"
-        };
-        this.saveUserSession();
-      }
-    }
-
-    const modalEl = document.getElementById("loginModal");
-    const modal = bootstrap.Modal.getInstance(modalEl);
-    if (modal) modal.hide();
-
+    this.saveUserSession();
     this.renderAll();
   },
 
@@ -526,7 +635,43 @@ const TeamFairApp = {
   },
 
   renderAll() {
+    if (!this.currentUser) {
+      document.getElementById("authPortalView")?.classList.remove("d-none");
+      document.getElementById("mainAppWorkspaceView")?.classList.add("d-none");
+      document.getElementById("btnHeaderLogin")?.classList.remove("d-none");
+      document.getElementById("userAccountDropdown")?.classList.add("d-none");
+      const topName = document.getElementById("topTeamName");
+      if (topName) topName.textContent = "Chưa đăng nhập";
+      document.getElementById("topJoinCodeBadge")?.classList.add("d-none");
+      return;
+    }
+
+    document.getElementById("authPortalView")?.classList.add("d-none");
+    document.getElementById("mainAppWorkspaceView")?.classList.remove("d-none");
+    document.getElementById("btnHeaderLogin")?.classList.add("d-none");
+    document.getElementById("userAccountDropdown")?.classList.remove("d-none");
+
     this.renderHeaderAndUser();
+
+    // Check if team is active
+    const teamHubView = document.getElementById("teamHubView");
+    const roleBanner = document.getElementById("roleBanner");
+    const leaderView = document.getElementById("dash-leader-view");
+    const memberView = document.getElementById("dash-member-view");
+
+    if (!this.state.members || this.state.members.length === 0) {
+      // No team yet or user hasn't created/joined
+      if (teamHubView) teamHubView.classList.remove("d-none");
+      if (roleBanner) roleBanner.classList.add("d-none");
+      if (leaderView) leaderView.classList.add("d-none");
+      if (memberView) memberView.classList.add("d-none");
+      const elGreeting = document.getElementById("hubGreetingName");
+      if (elGreeting) elGreeting.textContent = this.currentUser.name;
+    } else {
+      if (teamHubView) teamHubView.classList.add("d-none");
+      if (roleBanner) roleBanner.classList.remove("d-none");
+    }
+
     if (this.activeTab === "dashboard") this.renderDashboard();
     if (this.activeTab === "tasks") this.renderTasks();
     if (this.activeTab === "schedule") this.renderSchedule();
@@ -537,6 +682,7 @@ const TeamFairApp = {
   },
 
   renderHeaderAndUser() {
+    if (!this.currentUser) return;
     const totalTasks = this.state.tasks.length;
     const doneTasks = this.state.tasks.filter(t => t.status === "done").length;
     const unreadEmails = this.state.emails.length;
@@ -548,7 +694,24 @@ const TeamFairApp = {
     if (elEmailBadge) elEmailBadge.textContent = unreadEmails;
 
     const elTeamName = document.getElementById("topTeamName");
-    if (elTeamName) elTeamName.textContent = this.state.team.name || "Nhóm của tôi";
+    if (elTeamName) {
+      elTeamName.textContent = this.state.members.length > 0 ? (this.state.team.name || "Nhóm của tôi") : "Chưa có nhóm";
+    }
+
+    // Join Code in Header
+    const topJoinBadge = document.getElementById("topJoinCodeBadge");
+    const topJoinText = document.getElementById("topJoinCodeText");
+    const bannerJoinDisplay = document.getElementById("bannerJoinCodeDisplay");
+    const bannerJoinText = document.getElementById("bannerJoinCodeText");
+    if (this.state.team && this.state.team.joinCode && this.state.members.length > 0) {
+      if (topJoinBadge) topJoinBadge.classList.remove("d-none");
+      if (topJoinText) topJoinText.textContent = this.state.team.joinCode;
+      if (bannerJoinDisplay) bannerJoinDisplay.classList.remove("d-none");
+      if (bannerJoinText) bannerJoinText.textContent = this.state.team.joinCode;
+    } else {
+      if (topJoinBadge) topJoinBadge.classList.add("d-none");
+      if (bannerJoinDisplay) bannerJoinDisplay.classList.add("d-none");
+    }
 
     // User profile in Header
     const isLeader = this.currentUser.roleType === "Leader";
@@ -570,8 +733,14 @@ const TeamFairApp = {
     const elDDName = document.getElementById("ddUserName");
     if (elDDName) elDDName.textContent = this.currentUser.name;
 
-    const elDDRole = document.getElementById("ddUserRole");
-    if (elDDRole) elDDRole.textContent = isLeader ? "Vai trò: Nhóm Trưởng (Leader)" : "Vai trò: Thành Viên (Member)";
+    const elDDEmail = document.getElementById("ddUserEmail");
+    if (elDDEmail) elDDEmail.textContent = this.currentUser.email || "Chưa có email";
+
+    const elDDRole = document.getElementById("ddRoleBadge");
+    if (elDDRole) {
+      elDDRole.className = isLeader ? "badge bg-success" : "badge bg-primary";
+      elDDRole.textContent = isLeader ? "👑 Nhóm Trưởng (Leader)" : "🧑 Thành Viên (Member)";
+    }
 
     const elTabTitle = document.getElementById("tabDashboardTitle");
     if (elTabTitle) elTabTitle.textContent = isLeader ? "Dashboard Nhóm Trưởng" : "Dashboard Thành Viên";
