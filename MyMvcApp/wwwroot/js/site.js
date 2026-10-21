@@ -52,6 +52,24 @@ const TeamFairApp = {
   },
 
   loadUserSession() {
+    // 1. Kiểm tra cookie từ Google OAuth callback nếu có
+    const gUserCookie = this.getCookie("tf_google_user");
+    if (gUserCookie) {
+      try {
+        const parsed = JSON.parse(decodeURIComponent(gUserCookie));
+        if (parsed && parsed.email) {
+          this.currentUser = parsed;
+          this.saveUserSession();
+          document.cookie = "tf_google_user=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+          this.showToast(`Chào mừng ${parsed.name}! Đã đăng nhập bằng Google thành công.`, "success");
+          return;
+        }
+      } catch (e) {
+        console.warn("Lỗi đọc cookie Google OAuth:", e);
+      }
+    }
+
+    // 2. LocalStorage fallback
     try {
       const savedUser = localStorage.getItem("TeamFair_CurrentUser_v1");
       if (savedUser) {
@@ -62,6 +80,13 @@ const TeamFairApp = {
     } catch (e) {
       this.currentUser = null;
     }
+  },
+
+  getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return null;
   },
 
   saveUserSession() {
@@ -317,6 +342,10 @@ const TeamFairApp = {
   },
 
   handleGoogleAuthPrompt() {
+    window.location.href = "/auth/google-login";
+  },
+
+  openGoogleModalManual() {
     try {
       const modalEl = document.getElementById("modalGoogleAuth");
       if (modalEl) {
@@ -332,16 +361,28 @@ const TeamFairApp = {
         modalEl.classList.add('show');
         modalEl.style.display = 'block';
         document.body.classList.add('modal-open');
-        return;
       }
     } catch (e) {
-      console.warn("Bootstrap modal show error:", e);
+      console.warn("Lỗi mở modal Google:", e);
     }
+  },
 
-    const email = prompt("Đăng nhập tài khoản Google:\nNhập Email Google của bạn (hoặc nhấn OK để dùng tài khoản gợi ý):", "kpham6488@gmail.com");
-    if (email) {
-      this.handleGoogleLoginSubmit(email, "Phạm Anh Khôi");
+  closeGoogleAuthModal() {
+    const modalEl = document.getElementById("modalGoogleAuth");
+    if (modalEl) {
+      if (window.bootstrap && bootstrap.Modal) {
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+      }
+      modalEl.classList.remove('show');
+      modalEl.style.display = 'none';
+      modalEl.setAttribute('aria-hidden', 'true');
     }
+    // Xóa triệt để các backdrop còn sót lại để không bao giờ bị xám màn hình
+    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('overflow');
+    document.body.style.removeProperty('padding-right');
   },
 
   async handleGoogleLoginSubmit(presetEmail = null, presetName = null) {
@@ -365,11 +406,7 @@ const TeamFairApp = {
         return;
       }
 
-      const modalEl = document.getElementById("modalGoogleAuth");
-      if (modalEl) {
-        const modal = bootstrap.Modal.getInstance(modalEl);
-        if (modal) modal.hide();
-      }
+      this.closeGoogleAuthModal();
 
       this.currentUser = data.user;
       this.saveUserSession();
@@ -568,6 +605,20 @@ const TeamFairApp = {
         this.handleAddMeeting();
       });
     }
+
+    // Bảo vệ toàn cục: Tự động dọn sạch backdrop khi modal đóng
+    document.addEventListener('hidden.bs.modal', () => {
+      document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+      document.body.classList.remove('modal-open');
+      document.body.style.removeProperty('overflow');
+      document.body.style.removeProperty('padding-right');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (e.target && e.target.classList.contains('modal-backdrop')) {
+        this.closeGoogleAuthModal();
+      }
+    });
   },
 
   switchTab(tabId) {
@@ -1405,6 +1456,10 @@ const TeamFairApp = {
 
     container.innerHTML = this.state.members.map(m => {
       const taskCount = this.state.tasks.filter(t => t.assigneeId === m.id).length;
+      const isLeaderMember = m.roleType === 'Leader';
+      const hasCustomSkill = m.role && !["trưởng nhóm", "thành viên", "leader", "member"].includes(m.role.trim().toLowerCase());
+      const skillText = hasCustomSkill ? ` • <span class="badge bg-light text-slate-700 border" style="font-size: 0.7rem;">${m.role}</span>` : '';
+
       return `
         <div class="d-flex align-items-center justify-content-between p-2 mb-2 bg-light rounded-3 border">
           <div class="d-flex align-items-center gap-2">
@@ -1412,9 +1467,9 @@ const TeamFairApp = {
             <div>
               <div class="fw-bold text-slate-800" style="font-size: 0.875rem;">
                 ${m.name}
-                ${m.roleType === 'Leader' ? '<span class="badge bg-success" style="font-size: 0.65rem;">👑 Trưởng nhóm</span>' : ''}
+                ${isLeaderMember ? '<span class="badge bg-success" style="font-size: 0.65rem;">👑 Trưởng nhóm</span>' : ''}
               </div>
-              <div class="text-muted" style="font-size: 0.75rem;">${m.email || 'Chưa có email'} • <em>${m.role}</em></div>
+              <div class="text-muted" style="font-size: 0.75rem;">${m.email || 'Chưa có email'}${skillText}</div>
             </div>
           </div>
           <div class="d-flex align-items-center gap-2">
@@ -1572,8 +1627,9 @@ const TeamFairApp = {
 
     const name = document.getElementById("memberName")?.value.trim();
     const email = document.getElementById("memberEmail")?.value.trim();
-    const role = document.getElementById("memberRole")?.value.trim() || "Thành viên";
     const roleType = document.getElementById("memberRoleTypeSelect")?.value || "Member";
+    const roleInput = document.getElementById("memberRole")?.value.trim();
+    const role = roleInput || (roleType === "Leader" ? "Trưởng nhóm" : "Thành viên");
     const password = document.getElementById("memberPasswordInput")?.value.trim() || "123456";
 
     if (!name) {
