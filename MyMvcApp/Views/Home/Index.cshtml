@@ -1,5 +1,5 @@
 @{
-    ViewData["Title"] = "TeamFair - Đo đóng góp & Quản trị nhóm tự động";
+    ViewData["Title"] = "TeamFair - Quản lý tiến độ - Đánh giá công bằng - Tối ưu bài tập nhóm";
 }
 
 <div class="container-fluid px-3 px-lg-4 py-3">
@@ -13,7 +13,7 @@
                     <span class="badge bg-primary-subtle text-primary fw-bold px-2 py-1" style="font-size: 0.75rem;">Nền tảng Quản Trị Nhóm</span>
                 </div>
                 <div class="text-muted small mt-1" style="font-size: 0.825rem;">
-                    Đo đóng góp nhóm tự động — số lượng lẫn chất lượng, không ai phải chấm điểm ai
+                    Quản lý tiến độ - Đánh giá công bằng - Tối ưu bài tập nhóm
                 </div>
             </div>
         </div>
@@ -62,6 +62,18 @@
                             <span>Tham gia nhóm khác <em>(Bằng Mã Mời)</em></span>
                         </a>
                     </li>
+                    <li>
+                        <a class="dropdown-item rounded-2 py-2 small d-flex align-items-center gap-2 text-info fw-semibold" href="javascript:void(0)" onclick="TeamFairApp.loadDemoWorkspace()">
+                            <span>✨</span>
+                            <span>Nạp Dữ Liệu Mẫu <em>(Demo Workspace)</em></span>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item rounded-2 py-2 small d-flex align-items-center gap-2 text-secondary" href="javascript:void(0)" onclick="TeamFairApp.openOnboardingGuide()">
+                            <span>💡</span>
+                            <span>Hướng dẫn quy trình 4 bước</span>
+                        </a>
+                    </li>
                     <li><hr class="dropdown-divider"></li>
                     <li>
                         <a class="dropdown-item rounded-2 py-2 small d-flex align-items-center gap-2 text-danger" href="javascript:void(0)" onclick="TeamFairApp.logout()">
@@ -71,6 +83,12 @@
                     </li>
                 </ul>
             </div>
+
+            <!-- Onboarding Guide Button -->
+            <button class="btn btn-sm btn-outline-secondary fw-semibold d-flex align-items-center gap-1" onclick="TeamFairApp.openOnboardingGuide()" title="Xem hướng dẫn quy trình 4 bước làm việc nhóm">
+                <span>💡</span>
+                <span class="d-none d-md-inline">Hướng Dẫn</span>
+            </button>
 
             <!-- Direct Logout Button (Always Visible when logged in) -->
             <button class="btn btn-sm btn-outline-danger fw-semibold d-flex align-items-center gap-1" id="btnHeaderDirectLogout" onclick="TeamFairApp.logout()" title="Đăng xuất khỏi hệ thống">
@@ -244,76 +262,117 @@
         <div class="tf-tab-pane" id="pane-dashboard">
             <!-- ONBOARDING HUB VIEW (SHOWN WHEN NO TEAM HAS BEEN CREATED YET) -->
             <div id="teamHubView" class="mb-4 d-none">
-                <div class="p-4 bg-white rounded-4 border shadow-sm mb-4 text-center">
-                    <h4 class="fw-bold text-slate-900 mb-1">Xin chào, <span id="hubGreetingName">Bạn</span>! 👋</h4>
-                    <div class="text-muted">Bạn hiện đang có vai trò <strong>🧑 Thành Viên</strong>. Để bắt đầu làm việc, hãy chọn một trong hai lựa chọn bên dưới:</div>
+                <!-- Welcome & Guide Banner -->
+                <div class="p-4 bg-white rounded-4 border shadow-sm mb-4">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                        <div>
+                            <h4 class="fw-bold text-slate-900 mb-1">Xin chào, <span id="hubGreetingName">Bạn</span>! 👋</h4>
+                            <div class="text-muted">Chào mừng bạn đến với TeamFair. Chọn một trong các cách bên dưới để bắt đầu làm việc ngay:</div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-secondary fw-semibold btn-sm d-flex align-items-center gap-2" onclick="TeamFairApp.openOnboardingGuide()">
+                                <span>💡</span>
+                                <span>Xem Hướng Dẫn Quy Trình</span>
+                            </button>
+                            <button class="btn btn-tf-indigo text-white fw-semibold btn-sm d-flex align-items-center gap-2" onclick="TeamFairApp.loadDemoWorkspace()">
+                                <span>✨</span>
+                                <span>Trải Nghiệm Dữ Liệu Mẫu (Demo)</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
+
                 <div class="row g-4">
                     <!-- Option 1: Create New Team -->
-                    <div class="col-lg-7">
-                        <div class="tf-team-hub-card">
-                            <div class="d-flex align-items-center gap-3 mb-3">
-                                <span class="fs-1">👑</span>
-                                <div>
-                                    <h5 class="fw-bold text-slate-900 mb-1">Tạo Nhóm Mới (Bạn sẽ là Nhóm Trưởng)</h5>
-                                    <div class="text-muted small">Hệ thống sẽ chỉ định bạn làm Nhóm Trưởng toàn quyền quản trị và cấp Mã Nhóm mời bạn bè.</div>
+                    <div class="col-lg-4">
+                        <div class="tf-team-hub-card d-flex flex-column justify-content-between">
+                            <div>
+                                <div class="d-flex align-items-center gap-3 mb-3">
+                                    <span class="fs-1">👑</span>
+                                    <div>
+                                        <h5 class="fw-bold text-slate-900 mb-1">Tạo Nhóm Mới</h5>
+                                        <div class="text-muted small">Bạn sẽ là <strong>Nhóm Trưởng</strong> quản trị toàn diện.</div>
+                                    </div>
                                 </div>
+                                <form id="formHubCreateTeam" onsubmit="event.preventDefault(); TeamFairApp.handleCreateTeamHub();">
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold text-slate-700">Tên nhóm:</label>
+                                        <input type="text" id="hubTeamName" class="form-control" placeholder="VD: Nhóm 05 - KTPM" required />
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold text-slate-700">Đề tài đồ án:</label>
+                                        <input type="text" id="hubTeamTopic" class="form-control" placeholder="VD: Ứng dụng quản trị nhóm" />
+                                    </div>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-6">
+                                            <label class="form-label small fw-semibold text-slate-700">Môn học:</label>
+                                            <input type="text" id="hubTeamSubject" class="form-control" placeholder="VD: CNTT" />
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="form-label small fw-semibold text-slate-700">Hạn chót:</label>
+                                            <input type="date" id="hubTeamDeadline" class="form-control" />
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn-tf-primary text-white w-100 fw-bold py-2 mt-2">
+                                        🚀 Tạo Nhóm Mới
+                                    </button>
+                                </form>
                             </div>
-                            <form id="formHubCreateTeam" onsubmit="event.preventDefault(); TeamFairApp.handleCreateTeamHub();">
-                                <div class="mb-3">
-                                    <label class="form-label small fw-semibold text-slate-700">Tên nhóm:</label>
-                                    <input type="text" id="hubTeamName" class="form-control" placeholder="VD: Nhóm 05 - KTPM" required />
-                                </div>
-                                <div class="row g-2 mb-3">
-                                    <div class="col-md-6">
-                                        <label class="form-label small fw-semibold text-slate-700">Tên đề tài / Đồ án:</label>
-                                        <input type="text" id="hubTeamTopic" class="form-control" placeholder="VD: Nền tảng quản trị phân công nhóm" />
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label small fw-semibold text-slate-700">Môn học:</label>
-                                        <input type="text" id="hubTeamSubject" class="form-control" placeholder="VD: Công nghệ phần mềm" />
-                                    </div>
-                                </div>
-                                <div class="row g-2 mb-3">
-                                    <div class="col-md-6">
-                                        <label class="form-label small fw-semibold text-slate-700">Mã lớp / Giảng viên:</label>
-                                        <input type="text" id="hubTeamClass" class="form-control" placeholder="VD: 21CNTT01 - ThS. Minh" />
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label small fw-semibold text-slate-700">Hạn chót cuối kỳ:</label>
-                                        <input type="date" id="hubTeamDeadline" class="form-control" />
-                                    </div>
-                                </div>
-                                <button type="submit" class="btn btn-tf-primary text-white w-100 fw-bold py-2">
-                                    🚀 Tạo Nhóm Mới & Trở Thành Nhóm Trưởng
-                                </button>
-                            </form>
                         </div>
                     </div>
 
                     <!-- Option 2: Join Existing Team -->
-                    <div class="col-lg-5">
-                        <div class="tf-team-hub-card">
-                            <div class="d-flex align-items-center gap-3 mb-3">
-                                <span class="fs-1">🧑</span>
-                                <div>
-                                    <h5 class="fw-bold text-slate-900 mb-1">Tham Gia Nhóm (Vai trò Thành Viên)</h5>
-                                    <div class="text-muted small">Nhập mã nhóm do Nhóm Trưởng cung cấp (VD: TF-1234).</div>
+                    <div class="col-lg-4">
+                        <div class="tf-team-hub-card d-flex flex-column justify-content-between">
+                            <div>
+                                <div class="d-flex align-items-center gap-3 mb-3">
+                                    <span class="fs-1">🧑</span>
+                                    <div>
+                                        <h5 class="fw-bold text-slate-900 mb-1">Tham Gia Nhóm</h5>
+                                        <div class="text-muted small">Gia nhập với vai trò <strong>Thành Viên</strong>.</div>
+                                    </div>
                                 </div>
+                                <form id="formHubJoinTeam" onsubmit="event.preventDefault(); TeamFairApp.handleJoinTeamHub();">
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-semibold text-slate-700">Mã nhóm mời (Join Code):</label>
+                                        <input type="text" id="hubJoinCode" class="form-control text-uppercase fw-bold text-center" style="font-size: 1.25rem; letter-spacing: 2px;" placeholder="TF-xxxx" required />
+                                    </div>
+                                    <div class="p-3 bg-light rounded-3 small text-muted mb-4 border">
+                                        ✓ Nhận phân công nhiệm vụ từ Nhóm Trưởng.<br>
+                                        ✓ Cập nhật tiến độ qua Kanban, xếp lịch rảnh & chấm điểm chéo.
+                                    </div>
+                                    <button type="submit" class="btn btn-outline-primary w-100 fw-bold py-2">
+                                        🤝 Tham Gia Nhóm
+                                    </button>
+                                </form>
                             </div>
-                            <form id="formHubJoinTeam" onsubmit="event.preventDefault(); TeamFairApp.handleJoinTeamHub();">
-                                <div class="mb-3">
-                                    <label class="form-label small fw-semibold text-slate-700">Mã nhóm mời (Join Code):</label>
-                                    <input type="text" id="hubJoinCode" class="form-control text-uppercase fw-bold text-center" style="font-size: 1.25rem; letter-spacing: 2px;" placeholder="TF-xxxx" required />
+                        </div>
+                    </div>
+
+                    <!-- Option 3: Demo Workspace (Requirement 6) -->
+                    <div class="col-lg-4">
+                        <div class="tf-team-hub-card d-flex flex-column justify-content-between border-primary shadow-sm" style="background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%);">
+                            <div>
+                                <div class="d-flex align-items-center gap-3 mb-3">
+                                    <span class="fs-1">✨</span>
+                                    <div>
+                                        <h5 class="fw-bold text-slate-900 mb-1">Dữ Liệu Mẫu (Demo)</h5>
+                                        <div class="text-success small fw-semibold">1-Click Trải Nghiệm Toàn Diện</div>
+                                    </div>
                                 </div>
-                                <div class="p-3 bg-light rounded-3 small text-muted mb-4 border">
-                                    ✓ Tham gia với tư cách <strong>Thành viên</strong>.<br>
-                                    ✓ Nhận phân công nhiệm vụ, cập nhật tiến độ công việc và đánh giá chéo đồng đội.
-                                </div>
-                                <button type="submit" class="btn btn-outline-primary w-100 fw-bold py-2">
-                                    🤝 Tham Gia Nhóm
-                                </button>
-                            </form>
+                                <p class="small text-slate-600 mb-3">
+                                    Bạn là người dùng mới hoặc chưa có nhóm thực tế? Nạp ngay nhóm mẫu 4 sinh viên để trải nghiệm thực tế:
+                                </p>
+                                <ul class="small text-muted ps-3 mb-3">
+                                    <li>Đã có 4 thành viên phân chia vai trò rõ ràng</li>
+                                    <li>6 nhiệm vụ trên bảng Kanban đầy đủ trạng thái</li>
+                                    <li>Lịch rảnh & khung giờ họp nhóm được tối ưu</li>
+                                    <li>Đã có sẵn dữ liệu chấm điểm chéo & KPI công bằng</li>
+                                </ul>
+                            </div>
+                            <button type="button" class="btn btn-tf-indigo text-white w-100 fw-bold py-2 shadow-sm" onclick="TeamFairApp.loadDemoWorkspace()">
+                                🚀 Trải Nghiệm Demo Ngay
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1277,6 +1336,129 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: HƯỚNG DẪN VẬN HÀNH NHÓM (INTERACTIVE ONBOARDING GUIDE - REQ 6) -->
+<div class="modal fade" id="modalOnboardingGuide" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+            <div class="modal-header text-white" style="background: linear-gradient(135deg, #059669 0%, #0d9488 100%);">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-4">💡</span>
+                    <div>
+                        <h5 class="modal-title fw-bold mb-0">Hướng Dẫn Vận Hành Nhóm Đồ Án (4 Bước)</h5>
+                        <div class="small opacity-90">Mô phỏng quy trình phối hợp nhịp nhàng từ lúc tạo nhóm đến nộp bài & chấm điểm</div>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 bg-light">
+                <!-- Step Navigation Pills -->
+                <ul class="nav nav-pills nav-fill mb-4 p-1 bg-white rounded-3 border shadow-sm" id="onboardingPills" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active fw-semibold small py-2" id="ob-step1-tab" data-bs-toggle="pill" data-bs-target="#ob-step1" type="button" role="tab">
+                            1. 👑 Tạo & Mời
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link fw-semibold small py-2" id="ob-step2-tab" data-bs-toggle="pill" data-bs-target="#ob-step2" type="button" role="tab">
+                            2. 📋 Phân Việc Kanban
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link fw-semibold small py-2" id="ob-step3-tab" data-bs-toggle="pill" data-bs-target="#ob-step3" type="button" role="tab">
+                            3. 🚀 Nộp Bài & Đo KPI
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link fw-semibold small py-2" id="ob-step4-tab" data-bs-toggle="pill" data-bs-target="#ob-step4" type="button" role="tab">
+                            4. ⭐ Chấm Điểm & Báo Cáo
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content bg-white p-4 rounded-3 border shadow-sm">
+                    <!-- Step 1 Content -->
+                    <div class="tab-pane fade show active" id="ob-step1" role="tabpanel">
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <span class="fs-1 text-primary">👑</span>
+                            <div>
+                                <h5 class="fw-bold text-slate-900 mb-1">Bước 1: Khởi Tạo Nhóm & Cấp Mã Mời Nhanh</h5>
+                                <div class="text-muted small">Không cần thêm email thủ công, tham gia chỉ với 1 mã ngắn gọn</div>
+                            </div>
+                        </div>
+                        <p class="text-slate-700 small line-relaxed">
+                            • <strong>Nhóm Trưởng:</strong> Nhập tên nhóm, đề tài đồ án và hạn chót. Hệ thống tự sinh mã <strong>Mã Mời (Join Code)</strong> (Ví dụ: <code>TF-8392</code>).<br>
+                            • <strong>Thành viên:</strong> Đăng ký tài khoản và chỉ cần gõ đúng mã này là tự động được gia nhập nhóm ngay lập tức mà không cần chờ duyệt rườm rà.
+                        </p>
+                        <div class="p-3 bg-light rounded-3 border small text-muted">
+                            💡 <em>Mẹo:</em> Bạn có thể bấm vào huy hiệu mã nhóm ở góc trên màn hình để tự động sao chép mã gửi vào nhóm Zalo/Messenger của lớp!
+                        </div>
+                    </div>
+
+                    <!-- Step 2 Content -->
+                    <div class="tab-pane fade" id="ob-step2" role="tabpanel">
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <span class="fs-1 text-info">📋</span>
+                            <div>
+                                <h5 class="fw-bold text-slate-900 mb-1">Bước 2: Phân Chia Nhiệm Vụ & Bảng Kanban Trực Quan</h5>
+                                <div class="text-muted small">Rõ ràng trách nhiệm, không sợ đùn đẩy hoặc trùng lặp công việc</div>
+                            </div>
+                        </div>
+                        <p class="text-slate-700 small line-relaxed">
+                            • Chia nhỏ đồ án thành các đầu việc cụ thể (Tasks), gán người phụ trách, thời hạn (Deadline) và <strong>độ khó (1 - 5 ⭐)</strong> tương ứng với khối lượng.<br>
+                            • Bảng Kanban phân luồng 4 cột rõ ràng: <strong>Cần làm ➔ Đang làm ➔ Chờ duyệt ➔ Đã xong</strong>. Mỗi thành viên kéo thả hoặc bấm nút để chuyển trạng thái công việc của mình.
+                        </p>
+                        <div class="p-3 bg-light rounded-3 border small text-muted">
+                            💡 <em>Mẹo:</em> Người làm Task khó (3-5 sao) sẽ được hệ thống tính tỷ trọng đóng góp cao hơn task cơ bản, đảm bảo sự công bằng tuyệt đối.
+                        </div>
+                    </div>
+
+                    <!-- Step 3 Content -->
+                    <div class="tab-pane fade" id="ob-step3" role="tabpanel">
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <span class="fs-1 text-warning">🚀</span>
+                            <div>
+                                <h5 class="fw-bold text-slate-900 mb-1">Bước 3: Nộp Bài Minh Chứng & Tự Động Đo KPI</h5>
+                                <div class="text-muted small">Có làm là có ghi nhận, minh bạch dữ liệu đến từng commit</div>
+                            </div>
+                        </div>
+                        <p class="text-slate-700 small line-relaxed">
+                            • Khi hoàn thành công việc, thành viên gắn <strong>Link minh chứng nộp bài</strong> (GitHub Repo, Google Drive, Figma, Tài liệu Word...) để Nhóm Trưởng nghiệm thu.<br>
+                            • Hệ thống thuật toán thông minh sẽ tự động phân tích: Tỷ lệ hoàn thành đúng hạn + Trọng số độ khó = <strong>Chỉ số đóng góp (% Contribution)</strong> theo thời gian thực.
+                        </p>
+                        <div class="p-3 bg-light rounded-3 border small text-muted">
+                            💡 <em>Mẹo:</em> Tỷ lệ đóng góp hiển thị công khai trên Dashboard của nhóm, giúp phát hiện sớm thành viên bị trễ hạn để kịp thời hỗ trợ hoặc nhắc nhở.
+                        </div>
+                    </div>
+
+                    <!-- Step 4 Content -->
+                    <div class="tab-pane fade" id="ob-step4" role="tabpanel">
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <span class="fs-1 text-success">⭐</span>
+                            <div>
+                                <h5 class="fw-bold text-slate-900 mb-1">Bước 4: Đánh Giá Chéo & Xuất Báo Cáo Nộp Giảng Viên</h5>
+                                <div class="text-muted small">Đánh giá đa chiều, khách quan và xuất bản in báo cáo chuyên nghiệp</div>
+                            </div>
+                        </div>
+                        <p class="text-slate-700 small line-relaxed">
+                            • Cuối giai đoạn hoặc cuối kỳ, các thành viên thực hiện <strong>Đánh Giá Chéo</strong> nhau theo 4 tiêu chí cốt lõi: Chất lượng bàn giao, Đúng tiến độ, Nỗ lực và Tinh thần hợp tác.<br>
+                            • Bấm nút <strong>"Báo Cáo Nộp Bài"</strong> cố định trên Header để xuất ngay trang Báo cáo chuẩn học thuật kèm Biểu đồ phân bổ công việc, danh sách Task và đề xuất % điểm nhóm cho Giảng viên.
+                        </p>
+                        <div class="p-3 bg-light rounded-3 border small text-muted">
+                            💡 <em>Mẹo:</em> Báo cáo được tối ưu định dạng in (Print-friendly) để lưu PDF nộp kèm đồ án cho Thầy/Cô một cách dễ dàng.
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-white d-flex justify-content-between align-items-center">
+                <button type="button" class="btn btn-tf-indigo text-white fw-semibold" onclick="bootstrap.Modal.getInstance(document.getElementById('modalOnboardingGuide')).hide(); TeamFairApp.loadDemoWorkspace();">
+                    ✨ Nạp Dữ Liệu Mẫu (Demo Workspace)
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đã Hiểu, Bắt Đầu Làm Việc</button>
             </div>
         </div>
     </div>

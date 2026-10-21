@@ -1,4 +1,6 @@
-/* TeamFair Modern Design System */
+/* TeamFair Modern Ergonomic Design System - Anti-Eye-Strain */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 :root {
   --tf-primary: #059669;
   --tf-primary-hover: #047857;
@@ -16,35 +18,41 @@
   --tf-slate-200: #e2e8f0;
   --tf-slate-300: #cbd5e1;
   --tf-slate-400: #94a3b8;
+  --tf-slate-500: #64748b;
   --tf-slate-600: #475569;
   --tf-slate-700: #334155;
   --tf-slate-800: #1e293b;
   --tf-slate-900: #0f172a;
-  --tf-card-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
-  --tf-card-hover: 0 12px 30px -4px rgba(15, 23, 42, 0.1), 0 4px 8px -2px rgba(15, 23, 42, 0.06);
-  --tf-radius: 14px;
+  --tf-card-shadow: 0 2px 12px -2px rgba(15, 23, 42, 0.05), 0 1px 4px -1px rgba(15, 23, 42, 0.03);
+  --tf-card-hover: 0 10px 24px -4px rgba(15, 23, 42, 0.08), 0 4px 8px -2px rgba(15, 23, 42, 0.04);
+  --tf-radius: 16px;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  background-color: #f6f8fb;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: #f8fafc;
   color: var(--tf-slate-800);
-  line-height: 1.5;
+  line-height: 1.6;
+  letter-spacing: -0.011em;
   -webkit-font-smoothing: antialiased;
+}
+
+.line-relaxed {
+  line-height: 1.65;
 }
 
 /* Custom Utilities */
 .bg-slate-50 { background-color: var(--tf-slate-50); }
 .bg-slate-100 { background-color: var(--tf-slate-100); }
 .bg-slate-800 { background-color: var(--tf-slate-800); }
-.text-slate-500 { color: var(--tf-slate-400); }
+.text-slate-500 { color: var(--tf-slate-500); }
 .text-slate-600 { color: var(--tf-slate-600); }
 .text-slate-700 { color: var(--tf-slate-700); }
 .text-slate-800 { color: var(--tf-slate-800); }
 .text-slate-900 { color: var(--tf-slate-900); }
 .text-primary-tf { color: var(--tf-primary); }
 
-/* Glass & Card Styles */
+/* Glass & Card Styles - Soft white-space & Gentle Borders */
 .tf-card {
   background: #ffffff;
   border: 1px solid var(--tf-slate-200);
@@ -58,13 +66,13 @@ body {
 }
 
 .tf-card-header {
-  padding: 1rem 1.25rem;
+  padding: 1.15rem 1.5rem;
   border-bottom: 1px solid var(--tf-slate-100);
   background: transparent;
 }
 
 .tf-card-body {
-  padding: 1.25rem;
+  padding: 1.5rem;
 }
 
 /* Step Badges matching user's original design */
@@ -252,44 +260,52 @@ body {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* Task Difficulty Badges */
+/* Task Difficulty Badges - Softer pastel eye-friendly colors */
 .badge-diff-easy {
-  background-color: #dcfce7;
-  color: #15803d;
+  background-color: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
   font-weight: 600;
 }
 .badge-diff-medium {
-  background-color: #e0f2fe;
+  background-color: #f0f9ff;
   color: #0369a1;
+  border: 1px solid #bae6fd;
   font-weight: 600;
 }
 .badge-diff-hard {
-  background-color: #fef3c7;
+  background-color: #fffbeb;
   color: #b45309;
+  border: 1px solid #fde68a;
   font-weight: 600;
 }
 .badge-diff-vhard {
-  background-color: #fee2e2;
+  background-color: #fef2f2;
   color: #b91c1c;
+  border: 1px solid #fecaca;
   font-weight: 600;
 }
 
-/* Status Badges */
+/* Status Badges - Gentle tones */
 .badge-status-todo {
-  background-color: #f1f5f9;
+  background-color: #f8fafc;
   color: #475569;
+  border: 1px solid #e2e8f0;
 }
 .badge-status-doing {
-  background-color: #e0e7ff;
-  color: #3730a3;
+  background-color: #eef2ff;
+  color: #4338ca;
+  border: 1px solid #c7d2fe;
 }
 .badge-status-review {
-  background-color: #fef3c7;
+  background-color: #fffbeb;
   color: #92400e;
+  border: 1px solid #fde68a;
 }
 .badge-status-done {
-  background-color: #d1fae5;
+  background-color: #ecfdf5;
   color: #065f46;
+  border: 1px solid #a7f3d0;
 }
 
 /* Progress bar styled */
@@ -333,28 +349,28 @@ body {
   position: relative;
 }
 .tf-schedule-cell:hover {
-  transform: scale(1.03);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+  transform: scale(1.02);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
 }
 .tf-slot-free-all {
-  background-color: #bbf7d0;
-  color: #166534;
-  border: 2px solid #22c55e;
+  background-color: #d1fae5;
+  color: #065f46;
+  border: 1.5px solid #6ee7b7;
 }
 .tf-slot-free-high {
-  background-color: #dcfce7;
-  color: #15803d;
-  border: 1px solid #86efac;
+  background-color: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
 }
 .tf-slot-free-med {
-  background-color: #fef9c3;
+  background-color: #fefce8;
   color: #854d0e;
-  border: 1px solid #fde047;
+  border: 1px solid #fef08a;
 }
 .tf-slot-free-low {
-  background-color: #fee2e2;
-  color: #991b1b;
-  border: 1px solid #fca5a5;
+  background-color: #fff1f2;
+  color: #9f1239;
+  border: 1px solid #fecdd3;
 }
 
 /* Meeting Room Virtual Simulation */

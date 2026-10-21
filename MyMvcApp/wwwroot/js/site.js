@@ -151,14 +151,20 @@ const TeamFairApp = {
 
   syncCurrentUserWithMembers() {
     if (this.currentUser && this.currentUser.roleType === "Member") {
-      const matched = this.state.members.find(m => m.id === this.currentUser.id || m.email === this.currentUser.email);
+      const matched = this.state.members.find(m =>
+        m.id === this.currentUser.id ||
+        (m.email && this.currentUser.email && m.email.toLowerCase() === this.currentUser.email.toLowerCase())
+      );
       if (matched) {
-        this.currentUser = { ...matched, roleType: "Member" };
-        this.saveUserSession();
-      } else if (this.state.members.length > 0) {
-        this.currentUser = { ...this.state.members[0], roleType: "Member" };
+        this.currentUser = {
+          ...this.currentUser,
+          ...matched,
+          name: this.currentUser.name || matched.name,
+          roleType: "Member"
+        };
         this.saveUserSession();
       }
+      // KHÔNG tự ý ghi đè this.currentUser bằng this.state.members[0] để bảo toàn tài khoản vừa đăng ký/đăng nhập
     }
 
     if (this.state.members.length > 0 && !this.currentSchedulerMemberId) {
@@ -291,11 +297,26 @@ const TeamFairApp = {
         return;
       }
 
-      this.currentUser = data.user;
+      // Lưu đầy đủ user data với tên đăng ký thực tế
+      this.currentUser = {
+        ...data.user,
+        name: name,
+        roleType: "Member",
+        role: "Thành viên"
+      };
       this.saveUserSession();
+
+      // Reset form
+      const elName = document.getElementById("inputRegName");
+      const elEmail = document.getElementById("inputRegEmail");
+      const elPass = document.getElementById("inputRegPassword");
+      if (elName) elName.value = "";
+      if (elEmail) elEmail.value = "";
+      if (elPass) elPass.value = "";
+
       await this.loadState();
       this.renderAll();
-      this.showToast(`Chào mừng ${data.user.name}! Bạn hiện là 🧑 Thành viên. Hãy tự tạo nhóm nếu muốn làm Nhóm Trưởng nhé!`, "success");
+      this.showToast(`🎉 Đăng ký tài khoản thành công! Chào mừng ${name}. Bạn hiện là 🧑 Thành viên.`, "success");
     } catch (err) {
       console.error("Lỗi đăng ký:", err);
       alert("Lỗi kết nối đến máy chủ. Vui lòng thử lại!");
@@ -779,20 +800,25 @@ const TeamFairApp = {
 
     this.renderHeaderAndUser();
 
-    // Check if team is active
+    // Check if user has an active team
     const teamHubView = document.getElementById("teamHubView");
     const roleBanner = document.getElementById("roleBanner");
     const leaderView = document.getElementById("dash-leader-view");
     const memberView = document.getElementById("dash-member-view");
 
-    if (!this.state.members || this.state.members.length === 0) {
-      // No team yet or user hasn't created/joined
+    const hasJoinedTeam = this.state.members && this.state.members.length > 0 && (
+      this.currentUser.roleType === "Leader" ||
+      this.state.members.some(m => m.id === this.currentUser.id || (m.email && this.currentUser.email && m.email.toLowerCase() === this.currentUser.email.toLowerCase()))
+    );
+
+    if (!hasJoinedTeam) {
+      // User chưa tham gia nhóm nào hoặc chưa tạo nhóm: hiển thị Hub hướng dẫn & chọn hành động
       if (teamHubView) teamHubView.classList.remove("d-none");
       if (roleBanner) roleBanner.classList.add("d-none");
       if (leaderView) leaderView.classList.add("d-none");
       if (memberView) memberView.classList.add("d-none");
       const elGreeting = document.getElementById("hubGreetingName");
-      if (elGreeting) elGreeting.textContent = this.currentUser.name;
+      if (elGreeting) elGreeting.textContent = this.currentUser.name || "Bạn";
     } else {
       if (teamHubView) teamHubView.classList.add("d-none");
       if (roleBanner) roleBanner.classList.remove("d-none");
@@ -839,7 +865,7 @@ const TeamFairApp = {
       if (bannerJoinDisplay) bannerJoinDisplay.classList.add("d-none");
     }
 
-    // User profile in Header
+    // User profile in Header - Luôn hiển thị tên người dùng đã đăng ký/đăng nhập
     const isLeader = this.currentUser.roleType === "Leader";
     const elUserName = document.getElementById("userNameDisplay");
     if (elUserName) elUserName.textContent = this.currentUser.name || (isLeader ? "Trưởng Nhóm" : "Thành Viên");
@@ -853,11 +879,11 @@ const TeamFairApp = {
     const elAvatar = document.getElementById("userAvatarBadge");
     if (elAvatar) {
       elAvatar.style.backgroundColor = this.currentUser.color || (isLeader ? "#059669" : "#2563eb");
-      elAvatar.textContent = this.currentUser.avatar || (isLeader ? "TN" : "TV");
+      elAvatar.textContent = this.currentUser.avatar || (this.currentUser.name ? this.currentUser.name.trim().substring(0, 2).toUpperCase() : (isLeader ? "TN" : "TV"));
     }
 
     const elDDName = document.getElementById("ddUserName");
-    if (elDDName) elDDName.textContent = this.currentUser.name;
+    if (elDDName) elDDName.textContent = this.currentUser.name || "Thành Viên";
 
     const elDDEmail = document.getElementById("ddUserEmail");
     if (elDDEmail) elDDEmail.textContent = this.currentUser.email || "Chưa có email";
@@ -2477,6 +2503,212 @@ const TeamFairApp = {
     toastEl.addEventListener('hidden.bs.toast', () => {
       toastEl.remove();
     });
+  },
+
+  /* ================= REQ 6: DEMO WORKSPACE & INTERACTIVE ONBOARDING ================= */
+  loadDemoWorkspace() {
+    const demoTeam = {
+      name: "Nhóm 05 - Ứng Dụng Web Di Động",
+      topic: "Hệ thống quản lý chuỗi cung ứng thực phẩm sạch",
+      subject: "Phát triển Ứng dụng Web - CNTT K21",
+      classCode: "21CNTT01 - GVHD: ThS. Minh",
+      finalDeadline: "2026-11-20",
+      joinCode: "TF-DEMO"
+    };
+
+    const currentName = (this.currentUser && this.currentUser.name) ? this.currentUser.name : "Nguyễn Văn An";
+    const currentEmail = (this.currentUser && this.currentUser.email) ? this.currentUser.email : "an.nguyen@student.edu.vn";
+
+    const demoMembers = [
+      {
+        id: "mem_demo_1",
+        name: `${currentName} (Bạn)`,
+        email: currentEmail,
+        role: "Trưởng nhóm & Fullstack Developer",
+        roleType: "Leader",
+        color: "#059669",
+        avatar: "NT"
+      },
+      {
+        id: "mem_demo_2",
+        name: "Trần Thị Mai",
+        email: "mai.tran@student.edu.vn",
+        role: "UI/UX & Frontend Designer",
+        roleType: "Member",
+        color: "#2563eb",
+        avatar: "TM"
+      },
+      {
+        id: "mem_demo_3",
+        name: "Lê Hoàng Nam",
+        email: "nam.le@student.edu.vn",
+        role: "Backend & Database Architect",
+        roleType: "Member",
+        color: "#7c3aed",
+        avatar: "HN"
+      },
+      {
+        id: "mem_demo_4",
+        name: "Phạm Đức Anh",
+        email: "anh.pham@student.edu.vn",
+        role: "Tester & QA Specialist",
+        roleType: "Member",
+        color: "#ea580c",
+        avatar: "ĐA"
+      }
+    ];
+
+    const demoTasks = [
+      {
+        id: "task_demo_1",
+        title: "Thiết kế wireframe & prototype giao diện",
+        assignedTo: "mem_demo_2",
+        deadline: "2026-10-25",
+        difficulty: 4,
+        status: "done",
+        desc: "Thiết kế UI/UX trên Figma theo chuẩn Tailwind và Material Design",
+        submissionLink: "https://figma.com/file/demo-prototype-nhom05",
+        submissionNote: "Đã hoàn thành 100% các màn hình chính và responsive mobile."
+      },
+      {
+        id: "task_demo_2",
+        title: "Thiết kế kiến trúc CSDL & EF Core Migrations",
+        assignedTo: "mem_demo_3",
+        deadline: "2026-10-28",
+        difficulty: 4,
+        status: "done",
+        desc: "Thiết kế ERD, quan hệ 1-n, bảng Users, Teams, Tasks, Reviews",
+        submissionLink: "https://github.com/teamfair-demo/backend-api",
+        submissionNote: "Database đã migrate lên Azure SQL chạy ổn định."
+      },
+      {
+        id: "task_demo_3",
+        title: "Xây dựng luồng phân quyền và bảo mật JWT / Google OAuth",
+        assignedTo: "mem_demo_1",
+        deadline: "2026-11-02",
+        difficulty: 5,
+        status: "review",
+        desc: "Cấu hình Google OAuth, kiểm soát vai trò Nhóm Trưởng và Thành Viên",
+        submissionLink: "https://github.com/teamfair-demo/auth-service",
+        submissionNote: "Đang chờ nhóm test nghiệm thu luồng callback."
+      },
+      {
+        id: "task_demo_4",
+        title: "Viết Unit Tests và kịch bản kiểm thử luồng chấm điểm",
+        assignedTo: "mem_demo_4",
+        deadline: "2026-11-05",
+        difficulty: 3,
+        status: "doing",
+        desc: "Viết kiểm thử tự động xUnit cho thuật toán tính KPI đóng góp",
+        submissionLink: "",
+        submissionNote: ""
+      },
+      {
+        id: "task_demo_5",
+        title: "Tích hợp phòng họp ảo và lên lịch rảnh nhóm",
+        assignedTo: "mem_demo_1",
+        deadline: "2026-11-08",
+        difficulty: 3,
+        status: "doing",
+        desc: "Mô phỏng grid webcam và chia sẻ màn hình trực tuyến",
+        submissionLink: "",
+        submissionNote: ""
+      },
+      {
+        id: "task_demo_6",
+        title: "Hoàn thiện Slide thuyết trình và Báo cáo tổng kết đồ án",
+        assignedTo: "mem_demo_2",
+        deadline: "2026-11-15",
+        difficulty: 2,
+        status: "todo",
+        desc: "Tổng hợp số liệu từ TeamFair xuất ra báo cáo PDF nộp giảng viên",
+        submissionLink: "",
+        submissionNote: ""
+      }
+    ];
+
+    const demoSchedules = {
+      "mem_demo_1": ["tue_sang", "tue_chieu", "thu_toi", "sat_sang", "sat_chieu", "sun_toi"],
+      "mem_demo_2": ["tue_sang", "wed_chieu", "thu_toi", "fri_sang", "sat_sang", "sun_toi"],
+      "mem_demo_3": ["tue_sang", "thu_toi", "fri_chieu", "sat_sang", "sun_sang", "sun_toi"],
+      "mem_demo_4": ["tue_sang", "wed_sang", "thu_toi", "sat_sang", "sat_toi", "sun_toi"]
+    };
+
+    const demoMeetings = [
+      {
+        id: "meet_demo_1",
+        title: "Họp rà soát tiến độ Sprint 2 & Chốt phân công đồ án",
+        date: "2026-10-24",
+        time: "19:30",
+        platform: "TeamFair Virtual Room",
+        link: "#meeting",
+        notes: "Tất cả thành viên có mặt đúng giờ để rà soát Task và đánh giá chéo."
+      }
+    ];
+
+    const demoReviews = [
+      {
+        reviewerId: "mem_demo_1",
+        revieweeId: "mem_demo_2",
+        criteria: { quality: 5, deadline: 5, effort: 4, cooperation: 5 },
+        comment: "Mai thiết kế UI rất thẩm mỹ, phối màu dịu mắt và giao nộp đúng hẹn."
+      },
+      {
+        reviewerId: "mem_demo_1",
+        revieweeId: "mem_demo_3",
+        criteria: { quality: 5, deadline: 4, effort: 5, cooperation: 4 },
+        comment: "Nam thiết kế CSDL rất chuẩn xác, query tối ưu tốt."
+      },
+      {
+        reviewerId: "mem_demo_2",
+        revieweeId: "mem_demo_1",
+        criteria: { quality: 5, deadline: 5, effort: 5, cooperation: 5 },
+        comment: "Nhóm trưởng phân công công việc rõ ràng, theo sát tiến độ và hỗ trợ nhiệt tình."
+      }
+    ];
+
+    this.state = {
+      team: demoTeam,
+      members: demoMembers,
+      tasks: demoTasks,
+      schedules: demoSchedules,
+      meetings: demoMeetings,
+      reviews: demoReviews,
+      emails: [
+        {
+          id: "email_demo_1",
+          to: currentEmail,
+          subject: "[TeamFair] Thông báo giao việc mới: Luồng phân quyền",
+          body: "Chào bạn, Nhóm Trưởng đã giao cho bạn nhiệm vụ: 'Xây dựng luồng phân quyền và bảo mật JWT / Google OAuth'. Hạn chót: 02/11/2026.",
+          date: "21/10/2026 09:00"
+        }
+      ],
+      activities: [
+        { action: "Trần Thị Mai đã nộp minh chứng cho nhiệm vụ 'Thiết kế wireframe'", time: "Hôm nay 14:20" },
+        { action: "Lê Hoàng Nam đã hoàn thành nhiệm vụ 'Thiết kế kiến trúc CSDL'", time: "Hôm qua 18:30" }
+      ]
+    };
+
+    this.currentUser = {
+      ...demoMembers[0],
+      name: currentName,
+      email: currentEmail,
+      roleType: "Leader",
+      role: "Trưởng nhóm"
+    };
+
+    this.saveUserSession();
+    this.saveState();
+    this.renderAll();
+    this.showToast("✨ Đã nạp thành công Dữ liệu mẫu (Demo Workspace)! Bạn đang trải nghiệm đầy đủ vai trò Nhóm Trưởng.", "success");
+  },
+
+  openOnboardingGuide() {
+    const modalEl = document.getElementById("modalOnboardingGuide");
+    if (modalEl) {
+      const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+      modal.show();
+    }
   }
 };
 
