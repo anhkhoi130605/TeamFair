@@ -72,6 +72,12 @@
                 </ul>
             </div>
 
+            <!-- Direct Logout Button (Always Visible when logged in) -->
+            <button class="btn btn-sm btn-outline-danger fw-semibold d-flex align-items-center gap-1" id="btnHeaderDirectLogout" onclick="TeamFairApp.logout()" title="Đăng xuất khỏi hệ thống">
+                <span>🚪</span>
+                <span>Đăng Xuất</span>
+            </button>
+
             <!-- Login / Register button when not logged in -->
             <button class="btn btn-sm btn-primary d-none fw-semibold" id="btnHeaderLogin" onclick="TeamFairApp.showAuthPortal()">
                 🔑 Đăng Nhập / Đăng Ký
@@ -121,7 +127,7 @@
                     <hr class="flex-grow-1 my-0 border-secondary-subtle">
                 </div>
 
-                <button type="button" class="btn btn-outline-secondary w-100 py-2 d-flex align-items-center justify-content-center gap-2 fw-semibold bg-white shadow-sm hover-shadow transition" data-bs-toggle="modal" data-bs-target="#modalGoogleAuth" onclick="TeamFairApp.handleGoogleAuthPrompt()">
+                <button type="button" class="btn btn-outline-secondary w-100 py-2 d-flex align-items-center justify-content-center gap-2 fw-semibold bg-white shadow-sm hover-shadow transition" onclick="TeamFairApp.handleGoogleAuthPrompt()">
                     <svg width="20" height="20" viewBox="0 0 24 24">
                         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                         <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -130,6 +136,12 @@
                     </svg>
                     <span class="text-slate-800">Đăng nhập bằng tài khoản Google</span>
                 </button>
+
+                <div class="mt-2 text-center">
+                    <button type="button" class="btn btn-sm btn-light border text-muted small py-1 px-3 w-100" onclick="TeamFairApp.handleGoogleLoginSubmit('kpham6488@gmail.com', 'Phạm Anh Khôi')">
+                        ⚡ 1-Click nhanh: <strong>Phạm Anh Khôi</strong> (kpham6488@gmail.com)
+                    </button>
+                </div>
 
                 <div class="text-center mt-3">
                     <span class="small text-muted">Chưa có tài khoản? </span>
@@ -165,7 +177,7 @@
                     <hr class="flex-grow-1 my-0 border-secondary-subtle">
                 </div>
 
-                <button type="button" class="btn btn-outline-secondary w-100 py-2 d-flex align-items-center justify-content-center gap-2 fw-semibold bg-white shadow-sm hover-shadow transition" data-bs-toggle="modal" data-bs-target="#modalGoogleAuth" onclick="TeamFairApp.handleGoogleAuthPrompt()">
+                <button type="button" class="btn btn-outline-secondary w-100 py-2 d-flex align-items-center justify-content-center gap-2 fw-semibold bg-white shadow-sm hover-shadow transition" onclick="TeamFairApp.handleGoogleAuthPrompt()">
                     <svg width="20" height="20" viewBox="0 0 24 24">
                         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                         <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -174,6 +186,12 @@
                     </svg>
                     <span class="text-slate-800">Đăng ký nhanh bằng Google</span>
                 </button>
+
+                <div class="mt-2 text-center">
+                    <button type="button" class="btn btn-sm btn-light border text-muted small py-1 px-3 w-100" onclick="TeamFairApp.handleGoogleLoginSubmit('kpham6488@gmail.com', 'Phạm Anh Khôi')">
+                        ⚡ 1-Click nhanh: <strong>Phạm Anh Khôi</strong> (kpham6488@gmail.com)
+                    </button>
+                </div>
 
                 <div class="text-center mt-3">
                     <span class="small text-muted">Đã có tài khoản rồi? </span>

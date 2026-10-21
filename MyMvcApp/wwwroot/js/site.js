@@ -317,10 +317,30 @@ const TeamFairApp = {
   },
 
   handleGoogleAuthPrompt() {
-    const modalEl = document.getElementById("modalGoogleAuth");
-    if (modalEl) {
-      const modal = new bootstrap.Modal(modalEl);
-      modal.show();
+    try {
+      const modalEl = document.getElementById("modalGoogleAuth");
+      if (modalEl) {
+        if (window.bootstrap && bootstrap.Modal) {
+          const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+          modal.show();
+          return;
+        }
+        if (window.$ && $.fn && $.fn.modal) {
+          $('#modalGoogleAuth').modal('show');
+          return;
+        }
+        modalEl.classList.add('show');
+        modalEl.style.display = 'block';
+        document.body.classList.add('modal-open');
+        return;
+      }
+    } catch (e) {
+      console.warn("Bootstrap modal show error:", e);
+    }
+
+    const email = prompt("Đăng nhập tài khoản Google:\nNhập Email Google của bạn (hoặc nhấn OK để dùng tài khoản gợi ý):", "kpham6488@gmail.com");
+    if (email) {
+      this.handleGoogleLoginSubmit(email, "Phạm Anh Khôi");
     }
   },
 
@@ -685,6 +705,7 @@ const TeamFairApp = {
       document.getElementById("authPortalView")?.classList.remove("d-none");
       document.getElementById("mainAppWorkspaceView")?.classList.add("d-none");
       document.getElementById("btnHeaderLogin")?.classList.remove("d-none");
+      document.getElementById("btnHeaderDirectLogout")?.classList.add("d-none");
       document.getElementById("userAccountDropdown")?.classList.add("d-none");
       const topName = document.getElementById("topTeamName");
       if (topName) topName.textContent = "Chưa đăng nhập";
@@ -695,6 +716,7 @@ const TeamFairApp = {
     document.getElementById("authPortalView")?.classList.add("d-none");
     document.getElementById("mainAppWorkspaceView")?.classList.remove("d-none");
     document.getElementById("btnHeaderLogin")?.classList.add("d-none");
+    document.getElementById("btnHeaderDirectLogout")?.classList.remove("d-none");
     document.getElementById("userAccountDropdown")?.classList.remove("d-none");
 
     this.renderHeaderAndUser();
