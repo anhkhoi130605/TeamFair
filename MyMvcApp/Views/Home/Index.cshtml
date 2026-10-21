@@ -939,11 +939,15 @@
             <div class="tf-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <div>
                     <h5 class="fw-bold text-slate-900 mb-0">✉️ Hệ Thống Thông Báo & Nhắc Nhở Qua Email</h5>
-                    <div class="text-muted small">Hệ thống gửi email thông báo khi giao việc, nhắc nhở hạn chót, mời họp và báo cáo tiến độ.</div>
+                    <div class="text-muted small">Tự động gửi email khi: tới hạn chót theo cấu hình, thành viên xong task thông báo cả nhóm, giao việc và mời họp.</div>
                 </div>
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 flex-wrap">
+                    <button class="btn btn-sm btn-tf-primary text-white fw-semibold d-flex align-items-center gap-1" onclick="TeamFairApp.checkAndSendDeadlineReminders(true)">
+                        <span>🔔</span>
+                        <span>Quét & Gửi Email Nhắc Deadline</span>
+                    </button>
                     <button class="btn btn-sm btn-outline-danger" onclick="TeamFairApp.sendAllPendingReminders()">
-                        ⏰ Gửi email nhắc nhở hạn chót tất cả
+                        ⏰ Gửi nhắc tất cả việc chưa xong
                     </button>
                 </div>
             </div>
@@ -1336,7 +1340,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
-            </div>
+            </div>36
         </div>
     </div>
 </div>

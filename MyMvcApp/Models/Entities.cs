@@ -131,6 +131,14 @@ public class TeamTask
 
     public string? Description { get; set; }
 
+    [MaxLength(50)]
+    public string? ReminderTiming { get; set; } = "1_day";
+
+    [MaxLength(50)]
+    public string? ReminderCustomDateTime { get; set; }
+
+    public bool ReminderSent { get; set; } = false;
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 

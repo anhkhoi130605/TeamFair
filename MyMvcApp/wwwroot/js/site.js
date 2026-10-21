@@ -49,6 +49,16 @@ const TeamFairApp = {
     await this.loadState();
     this.bindEvents();
     this.renderAll();
+
+    // Tự động kiểm tra nhắc hạn chót theo cấu hình khi vào trang
+    setTimeout(() => {
+      this.checkAndSendDeadlineReminders(false);
+    }, 2000);
+
+    // Định kỳ quét mỗi 5 phút một lần
+    setInterval(() => {
+      this.checkAndSendDeadlineReminders(false);
+    }, 5 * 60 * 1000);
   },
 
   loadUserSession() {
@@ -1027,14 +1037,17 @@ const TeamFairApp = {
     if (!task) return;
     task.status = "done";
     task.progress = 100;
+    const assignee = this.state.members.find(m => m.id === task.assigneeId);
+    const actorName = assignee ? assignee.name : "Thành viên";
     this.state.activities.unshift({
       time: "Vừa xong",
-      text: `Trưởng nhóm đã phê duyệt hoàn thành nhiệm vụ: '${task.title}'`,
+      text: `Trưởng nhóm đã phê duyệt hoàn thành nhiệm vụ: '${task.title}' của ${actorName}`,
       type: "task"
     });
+    this.notifyTeamTaskCompleted(task, actorName);
     this.saveState();
     this.renderAll();
-    this.showToast(`Đã duyệt hoàn thành công việc "${task.title}"!`, "success");
+    this.showToast(`Đã duyệt hoàn thành công việc "${task.title}" & gửi mail thông báo cho toàn đội!`, "success");
   },
 
   /* ------------------- DASHBOARD 2: MEMBER ------------------- */
@@ -1159,6 +1172,7 @@ const TeamFairApp = {
   setMemberTaskProgress(taskId, progressVal) {
     const task = this.state.tasks.find(t => t.id === taskId);
     if (!task) return;
+    const oldStatus = task.status;
     task.progress = progressVal;
     if (progressVal === 100) task.status = "done";
     else if (progressVal > 0) task.status = "doing";
@@ -1170,6 +1184,10 @@ const TeamFairApp = {
       type: "task"
     });
 
+    if (progressVal === 100 && oldStatus !== "done") {
+      this.notifyTeamTaskCompleted(task, this.currentUser.name);
+    }
+
     this.saveState();
     this.renderAll();
     this.showToast(`Đã cập nhật tiến độ ${progressVal}%!`, "success");
@@ -1178,18 +1196,26 @@ const TeamFairApp = {
   submitTaskForReview(taskId) {
     const task = this.state.tasks.find(t => t.id === taskId);
     if (!task) return;
-    task.status = "review";
-    if (task.progress < 90) task.progress = 90;
 
-    this.state.activities.unshift({
-      time: "Vừa xong",
-      text: `${this.currentUser.name} đã nộp kết quả công việc '${task.title}' và chuyển sang Chờ nghiệm thu.`,
-      type: "task"
-    });
+    const subLink = prompt(`Nhập link minh chứng kết quả (GitHub Repo, Drive, Figma, Docs...):`, task.submissionLink || "");
+    if (subLink !== null) {
+      task.submissionLink = subLink.trim();
+      const subNote = prompt("Ghi chú thêm về kết quả bàn giao (nếu có):", task.submissionNote || "Đã hoàn thành công việc theo đúng yêu cầu.");
+      if (subNote !== null) task.submissionNote = subNote.trim();
+      task.status = "done";
+      task.progress = 100;
 
-    this.saveState();
-    this.renderAll();
-    this.showToast(`Đã chuyển công việc "${task.title}" sang trạng thái Chờ nghiệm thu!`, "info");
+      this.state.activities.unshift({
+        time: "Vừa xong",
+        text: `${this.currentUser.name} đã hoàn thành và nộp kết quả công việc '${task.title}'.`,
+        type: "task"
+      });
+
+      this.notifyTeamTaskCompleted(task, this.currentUser.name);
+      this.saveState();
+      this.renderAll();
+      this.showToast(`Đã hoàn tất nộp bài và gửi email thông báo đến toàn bộ nhóm!`, "success");
+    }
   },
 
   renderMemberPendingReviews(memberId) {
@@ -1533,14 +1559,26 @@ const TeamFairApp = {
       const st = this.getStatusInfo(t.status);
       const isMyTask = t.assigneeId === this.currentUser.id;
 
+      let reminderBadge = '';
+      if (t.reminderTiming && t.reminderTiming !== 'none') {
+        let timingText = 'Trước 1 ngày';
+        if (t.reminderTiming === '2_days') timingText = 'Trước 2 ngày';
+        else if (t.reminderTiming === '3_days') timingText = 'Trước 3 ngày';
+        else if (t.reminderTiming === '6_hours') timingText = 'Trước 6 giờ';
+        else if (t.reminderTiming === 'on_deadline') timingText = 'Đúng ngày hạn';
+        else if (t.reminderTiming === 'custom' && t.reminderCustomDateTime) timingText = t.reminderCustomDateTime.replace('T', ' ');
+        reminderBadge = `<span class="badge bg-warning-subtle text-warning border border-warning-subtle small ms-1" title="Cấu hình gửi email nhắc deadline: ${timingText}">⏰ Nhắc mail: ${timingText}${t.reminderSent ? ' (Đã gửi ✓)' : ''}</span>`;
+      }
+
       return `
         <div class="card mb-3 border shadow-sm ${isMyTask ? 'border-primary' : ''}">
           <div class="card-body p-3">
             <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
-              <div class="d-flex align-items-center gap-2">
+              <div class="d-flex align-items-center gap-1 flex-wrap">
                 <span class="badge ${st.badge}">${st.label}</span>
                 <span class="badge ${diff.badge}">${diff.label}</span>
                 <span class="badge bg-light text-slate-600 border">${t.category || "Công việc"}</span>
+                ${reminderBadge}
                 ${isMyTask ? '<span class="badge bg-primary-subtle text-primary fw-bold">📌 Việc của bạn</span>' : ''}
               </div>
               <div class="d-flex align-items-center gap-2">
@@ -1570,11 +1608,9 @@ const TeamFairApp = {
                 <button class="btn btn-sm btn-light border py-1" onclick="TeamFairApp.quickUpdateProgress('${t.id}')">
                   📊 Tiến độ
                 </button>
-                ${isLeader ? `
-                  <button class="btn btn-sm btn-light border py-1" onclick="TeamFairApp.sendTaskReminderEmail('${t.id}')">
-                    ✉️ Nhắc
-                  </button>
-                ` : ''}
+                <button class="btn btn-sm btn-light border py-1" onclick="TeamFairApp.sendTaskReminderEmail('${t.id}')" title="Gửi email nhắc nhở trực tiếp ngay bây giờ">
+                  ✉️ Nhắc mail
+                </button>
                 <button class="btn btn-sm btn-tf-indigo py-1 text-white" onclick="TeamFairApp.openReviewModal('${t.id}')">
                   ⭐ Đánh giá
                 </button>
@@ -1595,6 +1631,10 @@ const TeamFairApp = {
     const category = document.getElementById("taskCategory")?.value || "Chung";
     const desc = document.getElementById("taskDesc")?.value.trim() || "";
 
+    const enableReminder = document.getElementById("taskEnableEmailReminder") ? document.getElementById("taskEnableEmailReminder").checked : true;
+    const reminderTiming = enableReminder ? (document.getElementById("taskReminderTiming")?.value || "1_day") : "none";
+    const reminderCustomDateTime = (enableReminder && reminderTiming === "custom") ? document.getElementById("taskReminderCustomTime")?.value || "" : "";
+
     if (!title) {
       alert("Vui lòng nhập tên công việc!");
       return;
@@ -1614,7 +1654,10 @@ const TeamFairApp = {
       category,
       status: "todo",
       progress: 0,
-      description: desc
+      description: desc,
+      reminderTiming,
+      reminderCustomDateTime,
+      reminderSent: false
     };
 
     this.state.tasks.unshift(newTask);
@@ -1628,18 +1671,23 @@ const TeamFairApp = {
     });
 
     if (assignee && assignee.email) {
+      let reminderInfo = "Hệ thống sẽ gửi email nhắc nhở hạn chót theo cấu hình.";
+      if (reminderTiming === "1_day") reminderInfo = "Email nhắc nhở sẽ gửi trước hạn 1 ngày.";
+      else if (reminderTiming === "2_days") reminderInfo = "Email nhắc nhở sẽ gửi trước hạn 2 ngày.";
+      else if (reminderTiming === "6_hours") reminderInfo = "Email nhắc nhở sẽ gửi trước hạn 6 giờ.";
+
       this.sendEmailNotification({
         to: assignee.email,
         toName: assignee.name,
         subject: `[TeamFair] Giao nhiệm vụ mới: ${title}`,
         type: "task_assigned",
-        content: `Bạn vừa được giao nhiệm vụ: "${title}". Độ khó: ${this.getDifficultyLabel(difficulty).label}. Hạn chót: ${deadline ? deadline.split('-').reverse().join('/') : "Chưa đặt"}.`
+        content: `Chào ${assignee.name},\n\nBạn vừa được giao nhiệm vụ: "${title}".\nĐộ khó: ${this.getDifficultyLabel(difficulty).label}.\nHạn chót: ${deadline ? deadline.split('-').reverse().join('/') : "Chưa đặt"}.\n${reminderInfo}\n\nChúc bạn hoàn thành tốt nhiệm vụ!`
       });
     }
 
     this.saveState();
     this.renderAll();
-    this.showToast(`Đã giao việc "${title}" thành công!`, "success");
+    this.showToast(`Đã giao việc "${title}" & kích hoạt cấu hình nhắc mail thành công!`, "success");
 
     document.getElementById("taskTitle").value = "";
     document.getElementById("taskDesc").value = "";
@@ -1736,6 +1784,7 @@ const TeamFairApp = {
     if (newProgress !== null) {
       const val = parseInt(newProgress);
       if (!isNaN(val) && val >= 0 && val <= 100) {
+        const oldStatus = task.status;
         task.progress = val;
         if (val === 100) task.status = "done";
         else if (val > 0) task.status = "doing";
@@ -1746,6 +1795,12 @@ const TeamFairApp = {
           text: `Tiến độ việc '${task.title}' được cập nhật lên ${val}%`,
           type: "task"
         });
+
+        if (val === 100 && oldStatus !== "done") {
+          const assignee = this.state.members.find(m => m.id === task.assigneeId);
+          const actor = (this.currentUser.id === task.assigneeId) ? this.currentUser.name : (assignee ? assignee.name : this.currentUser.name);
+          this.notifyTeamTaskCompleted(task, actor);
+        }
 
         this.saveState();
         this.renderAll();
@@ -2239,36 +2294,50 @@ const TeamFairApp = {
       return;
     }
 
-    listContainer.innerHTML = this.state.emails.map(em => `
-      <div class="card mb-3 border shadow-sm">
-        <div class="card-body p-3">
-          <div class="d-flex justify-content-between align-items-start mb-2">
-            <div>
-              <span class="badge bg-success text-white">Đã gửi thành công</span>
-              <span class="text-muted small ms-2">${em.sentAt}</span>
+    listContainer.innerHTML = this.state.emails.map(em => {
+      let typeBadge = '<span class="badge bg-primary-subtle text-primary border border-primary-subtle me-1">✉️ Thông báo</span>';
+      if (em.type === 'task_completed') {
+        typeBadge = '<span class="badge bg-success-subtle text-success border border-success-subtle me-1">🎯 Hoàn thành nhiệm vụ (Gửi toàn team)</span>';
+      } else if (em.type === 'deadline_reminder' || em.type === 'reminder') {
+        typeBadge = '<span class="badge bg-warning-subtle text-warning border border-warning-subtle me-1">⏰ Nhắc nhở hạn chót</span>';
+      } else if (em.type === 'task_assigned') {
+        typeBadge = '<span class="badge bg-primary-subtle text-primary border border-primary-subtle me-1">📋 Giao việc mới</span>';
+      } else if (em.type === 'meeting') {
+        typeBadge = '<span class="badge bg-info-subtle text-info border border-info-subtle me-1">📹 Nhắc lịch họp</span>';
+      }
+
+      return `
+        <div class="card mb-3 border shadow-sm">
+          <div class="card-body p-3">
+            <div class="d-flex justify-content-between align-items-start mb-2 flex-wrap gap-2">
+              <div class="d-flex align-items-center flex-wrap gap-1">
+                ${typeBadge}
+                <span class="badge bg-success text-white">✓ Đã gửi</span>
+                <span class="text-muted small ms-2">${em.sentAt}</span>
+              </div>
+              <span class="badge bg-light text-slate-700 border">Gửi đến: ${em.to}</span>
             </div>
-            <span class="badge bg-light text-slate-700 border">Gửi đến: ${em.to}</span>
-          </div>
-          <h6 class="fw-bold text-slate-900 mb-1">${em.subject}</h6>
-          <div class="small text-slate-600 mb-2">Người nhận: <strong>${em.toName}</strong> &lt;${em.to}&gt;</div>
-          <div class="p-3 bg-light rounded-3 small text-slate-800" style="white-space: pre-line;">
-            ${em.content}
-          </div>
-          <div class="text-end mt-2">
-            <button class="btn btn-sm btn-outline-primary" onclick="TeamFairApp.previewEmailModal('${em.id}')">
-              🔍 Xem định dạng HTML chuẩn
-            </button>
+            <h6 class="fw-bold text-slate-900 mb-1">${em.subject}</h6>
+            <div class="small text-slate-600 mb-2">Người nhận: <strong>${em.toName}</strong> &lt;${em.to}&gt;</div>
+            <div class="p-3 bg-light rounded-3 small text-slate-800" style="white-space: pre-line;">
+              ${em.content}
+            </div>
+            <div class="text-end mt-2">
+              <button class="btn btn-sm btn-outline-primary" onclick="TeamFairApp.previewEmailModal('${em.id}')">
+                🔍 Xem định dạng HTML chuẩn
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    `).join("");
+      `;
+    }).join("");
   },
 
   sendEmailNotification(emData) {
     const newEmail = {
-      id: "em" + Date.now(),
+      id: "em" + Date.now() + Math.floor(Math.random() * 1000),
       to: emData.to,
-      toName: emData.toName,
+      toName: emData.toName || (emData.to ? emData.to.split('@')[0] : "Thành viên"),
       subject: emData.subject,
       type: emData.type || "notification",
       sentAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
@@ -2276,6 +2345,147 @@ const TeamFairApp = {
     };
     this.state.emails.unshift(newEmail);
     this.saveState();
+
+    // Đồng bộ gửi vào CSDL Azure SQL & SMTP Service qua backend
+    try {
+      fetch("/api/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: emData.to,
+          toName: newEmail.toName,
+          subject: emData.subject,
+          type: newEmail.type,
+          content: emData.content
+        })
+      }).catch(err => {
+        console.warn("Lưu email backend notice:", err);
+      });
+    } catch (e) {
+      console.warn("Gửi email API error:", e);
+    }
+  },
+
+  /* Gửi email thông báo đến TOÀN BỘ thành viên khi có người hoàn thành Task (Requirement) */
+  notifyTeamTaskCompleted(task, completedByName) {
+    if (!this.state.members || !this.state.members.length) return;
+    const teamName = this.state.team?.name || "Đồ án nhóm";
+    const timeStr = new Date().toLocaleString('vi-VN');
+
+    let sentCount = 0;
+    this.state.members.forEach(member => {
+      if (member.email) {
+        const subject = `[TeamFair 🎉 Báo Cáo Hoàn Thành] ${completedByName} đã xong: "${task.title}"`;
+        const content = `Chào ${member.name},\n\n` +
+          `Thành viên ${completedByName} vừa cập nhật hoàn thành 100% nhiệm vụ thuộc đồ án "${teamName}".\n\n` +
+          `📌 Nhiệm vụ: "${task.title}"\n` +
+          `⭐ Độ khó: ${this.getDifficultyLabel(task.difficulty).label}\n` +
+          `📅 Hoàn thành lúc: ${timeStr}\n` +
+          `🔗 Minh chứng nộp bài: ${task.submissionLink || "Đã lưu trên hệ thống TeamFair"}\n` +
+          `📝 Ghi chú: ${task.submissionNote || "Nhiệm vụ đã hoàn thành đạt yêu cầu"}\n\n` +
+          `Các thành viên trong nhóm hãy kiểm tra và có thể tiến hành Chấm điểm chéo đánh giá cho đồng đội trên hệ thống TeamFair.`;
+
+        this.sendEmailNotification({
+          to: member.email,
+          toName: member.name,
+          subject: subject,
+          type: "task_completed",
+          content: content
+        });
+        sentCount++;
+      }
+    });
+
+    this.state.activities.unshift({
+      time: "Vừa xong",
+      text: `🎉 ${completedByName} hoàn thành nhiệm vụ '${task.title}' và hệ thống đã gửi email thông báo tới ${sentCount} thành viên trong nhóm.`,
+      type: "email"
+    });
+
+    this.saveState();
+    this.renderAll();
+    this.showToast(`🎉 Đã cập nhật xong nhiệm vụ! Tự động gửi email thông báo đến toàn bộ ${sentCount} thành viên trong nhóm.`, "success");
+  },
+
+  /* Quét và gửi email nhắc deadline cho các thành viên theo cấu hình (Requirement) */
+  checkAndSendDeadlineReminders(manualTrigger = false) {
+    const tasks = this.state.tasks.filter(t => t.status !== "done" && t.deadline);
+    const now = new Date();
+    let remindersSent = 0;
+
+    tasks.forEach(task => {
+      if (task.reminderTiming === "none") return;
+      if (task.reminderSent) return; // Đã gửi nhắc lần này
+
+      const assignee = this.state.members.find(m => m.id === task.assigneeId);
+      if (!assignee || !assignee.email) return;
+
+      const deadlineDate = new Date(task.deadline + "T23:59:59");
+      if (isNaN(deadlineDate.getTime())) return;
+
+      let triggerTime = new Date(deadlineDate);
+      const timing = task.reminderTiming || "1_day";
+
+      if (timing === "1_day") {
+        triggerTime.setDate(triggerTime.getDate() - 1);
+        triggerTime.setHours(8, 0, 0, 0); // 8h sáng hôm trước
+      } else if (timing === "2_days") {
+        triggerTime.setDate(triggerTime.getDate() - 2);
+        triggerTime.setHours(8, 0, 0, 0);
+      } else if (timing === "3_days") {
+        triggerTime.setDate(triggerTime.getDate() - 3);
+        triggerTime.setHours(8, 0, 0, 0);
+      } else if (timing === "6_hours") {
+        triggerTime.setHours(triggerTime.getHours() - 6);
+      } else if (timing === "on_deadline") {
+        triggerTime = new Date(task.deadline + "T08:00:00");
+      } else if (timing === "custom" && task.reminderCustomDateTime) {
+        triggerTime = new Date(task.reminderCustomDateTime);
+      }
+
+      // Kiểm tra xem thời điểm hiện tại đã đến hoặc vượt qua triggerTime chưa
+      if (now >= triggerTime) {
+        const teamName = this.state.team?.name || "Đồ án nhóm";
+        const deadlineFormatted = task.deadline.split('-').reverse().join('/');
+
+        const subject = `[TeamFair ⏰ Nhắc Hạn Chót] Nhiệm vụ "${task.title}" sắp tới hạn!`;
+        const content = `Chào ${assignee.name},\n\n` +
+          `Hệ thống TeamFair xin gửi thông báo nhắc nhở về hạn chót nhiệm vụ của bạn:\n\n` +
+          `📌 Nhiệm vụ: "${task.title}"\n` +
+          `⭐ Độ khó: ${this.getDifficultyLabel(task.difficulty).label}\n` +
+          `⏰ Hạn chót hoàn thành: ${deadlineFormatted}\n` +
+          `📊 Tiến độ hiện tại: ${task.progress}%\n` +
+          `📁 Nhóm: ${teamName}\n\n` +
+          `Vui lòng khẩn trương hoàn thiện, cập nhật tiến độ hoặc nộp minh chứng bài làm lên hệ thống để đảm bảo tiến độ chung của toàn đội!`;
+
+        this.sendEmailNotification({
+          to: assignee.email,
+          toName: assignee.name,
+          subject: subject,
+          type: "deadline_reminder",
+          content: content
+        });
+
+        task.reminderSent = true;
+        remindersSent++;
+
+        this.state.activities.unshift({
+          time: "Vừa xong",
+          text: `⏰ Đã tự động gửi email nhắc hạn chót nhiệm vụ '${task.title}' đến ${assignee.name} (${assignee.email}).`,
+          type: "email"
+        });
+      }
+    });
+
+    if (remindersSent > 0) {
+      this.saveState();
+      this.renderAll();
+      if (manualTrigger) {
+        this.showToast(`🔔 Đã quét và gửi email nhắc deadline thành công cho ${remindersSent} nhiệm vụ sắp đến hạn!`, "success");
+      }
+    } else if (manualTrigger) {
+      this.showToast("✓ Tất cả các nhiệm vụ đều chưa tới hạn nhắc nhở hoặc đã được gửi email trước đó.", "info");
+    }
   },
 
   sendTaskReminderEmail(taskId) {
@@ -2568,7 +2778,9 @@ const TeamFairApp = {
         status: "done",
         desc: "Thiết kế UI/UX trên Figma theo chuẩn Tailwind và Material Design",
         submissionLink: "https://figma.com/file/demo-prototype-nhom05",
-        submissionNote: "Đã hoàn thành 100% các màn hình chính và responsive mobile."
+        submissionNote: "Đã hoàn thành 100% các màn hình chính và responsive mobile.",
+        reminderTiming: "1_day",
+        reminderSent: true
       },
       {
         id: "task_demo_2",
@@ -2579,7 +2791,9 @@ const TeamFairApp = {
         status: "done",
         desc: "Thiết kế ERD, quan hệ 1-n, bảng Users, Teams, Tasks, Reviews",
         submissionLink: "https://github.com/teamfair-demo/backend-api",
-        submissionNote: "Database đã migrate lên Azure SQL chạy ổn định."
+        submissionNote: "Database đã migrate lên Azure SQL chạy ổn định.",
+        reminderTiming: "1_day",
+        reminderSent: true
       },
       {
         id: "task_demo_3",
@@ -2590,7 +2804,9 @@ const TeamFairApp = {
         status: "review",
         desc: "Cấu hình Google OAuth, kiểm soát vai trò Nhóm Trưởng và Thành Viên",
         submissionLink: "https://github.com/teamfair-demo/auth-service",
-        submissionNote: "Đang chờ nhóm test nghiệm thu luồng callback."
+        submissionNote: "Đang chờ nhóm test nghiệm thu luồng callback.",
+        reminderTiming: "2_days",
+        reminderSent: false
       },
       {
         id: "task_demo_4",
@@ -2601,7 +2817,9 @@ const TeamFairApp = {
         status: "doing",
         desc: "Viết kiểm thử tự động xUnit cho thuật toán tính KPI đóng góp",
         submissionLink: "",
-        submissionNote: ""
+        submissionNote: "",
+        reminderTiming: "1_day",
+        reminderSent: false
       },
       {
         id: "task_demo_5",
@@ -2612,7 +2830,9 @@ const TeamFairApp = {
         status: "doing",
         desc: "Mô phỏng grid webcam và chia sẻ màn hình trực tuyến",
         submissionLink: "",
-        submissionNote: ""
+        submissionNote: "",
+        reminderTiming: "1_day",
+        reminderSent: false
       },
       {
         id: "task_demo_6",
@@ -2623,7 +2843,9 @@ const TeamFairApp = {
         status: "todo",
         desc: "Tổng hợp số liệu từ TeamFair xuất ra báo cáo PDF nộp giảng viên",
         submissionLink: "",
-        submissionNote: ""
+        submissionNote: "",
+        reminderTiming: "3_days",
+        reminderSent: false
       }
     ];
 

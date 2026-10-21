@@ -11,11 +11,13 @@ public class ApiController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly ILogger<ApiController> _logger;
+    private readonly IConfiguration _config;
 
-    public ApiController(AppDbContext db, ILogger<ApiController> logger)
+    public ApiController(AppDbContext db, ILogger<ApiController> logger, IConfiguration config)
     {
         _db = db;
         _logger = logger;
+        _config = config;
     }
 
     [HttpGet("test-connection")]
@@ -481,7 +483,10 @@ public class ApiController : ControllerBase
                     category = t.Category,
                     status = t.Status,
                     progress = t.Progress,
-                    description = t.Description
+                    description = t.Description,
+                    reminderTiming = t.ReminderTiming ?? "1_day",
+                    reminderCustomDateTime = t.ReminderCustomDateTime,
+                    reminderSent = t.ReminderSent
                 }),
                 schedules,
                 meetings = meetings.Select(m => new
@@ -615,7 +620,10 @@ public class ApiController : ControllerBase
                         Category = t.Category ?? "Chung",
                         Status = t.Status ?? "todo",
                         Progress = t.Progress,
-                        Description = t.Description
+                        Description = t.Description,
+                        ReminderTiming = t.ReminderTiming ?? "1_day",
+                        ReminderCustomDateTime = t.ReminderCustomDateTime,
+                        ReminderSent = t.ReminderSent
                     });
                 }
             }
@@ -714,6 +722,86 @@ public class ApiController : ControllerBase
             return StatusCode(500, new { success = false, message = ex.Message });
         }
     }
+
+    [HttpPost("email/send")]
+    public async Task<IActionResult> SendEmail([FromBody] SendEmailRequestDto dto)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(dto.To))
+            {
+                return BadRequest(new { success = false, message = "Email người nhận không được để trống." });
+            }
+
+            var cleanTo = dto.To.Trim();
+            var newLog = new EmailLog
+            {
+                Id = "em" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                ToEmail = cleanTo,
+                ToName = !string.IsNullOrWhiteSpace(dto.ToName) ? dto.ToName.Trim() : cleanTo.Split('@')[0],
+                Subject = !string.IsNullOrWhiteSpace(dto.Subject) ? dto.Subject.Trim() : "[TeamFair] Thông báo từ hệ thống",
+                Type = dto.Type ?? "notification",
+                Content = dto.Content ?? "",
+                SentAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm")
+            };
+
+            _db.EmailLogs.Add(newLog);
+            await _db.SaveChangesAsync();
+
+            // Optional SMTP sending if configured in appsettings
+            var smtpHost = _config["EmailSettings:SmtpHost"];
+            var smtpPortStr = _config["EmailSettings:SmtpPort"];
+            var smtpUser = _config["EmailSettings:SmtpUser"];
+            var smtpPass = _config["EmailSettings:SmtpPass"];
+
+            if (!string.IsNullOrEmpty(smtpHost) && !string.IsNullOrEmpty(smtpUser) && !string.IsNullOrEmpty(smtpPass))
+            {
+                try
+                {
+                    int.TryParse(smtpPortStr, out var port);
+                    if (port == 0) port = 587;
+                    using var client = new System.Net.Mail.SmtpClient(smtpHost, port)
+                    {
+                        Credentials = new System.Net.NetworkCredential(smtpUser, smtpPass),
+                        EnableSsl = true
+                    };
+                    using var mailMsg = new System.Net.Mail.MailMessage
+                    {
+                        From = new System.Net.Mail.MailAddress(smtpUser, "TeamFair Platform"),
+                        Subject = newLog.Subject,
+                        Body = newLog.Content,
+                        IsBodyHtml = false
+                    };
+                    mailMsg.To.Add(newLog.ToEmail);
+                    await client.SendMailAsync(mailMsg);
+                }
+                catch (Exception smtpEx)
+                {
+                    Console.WriteLine($"SMTP notice: {smtpEx.Message}");
+                }
+            }
+
+            return Ok(new
+            {
+                success = true,
+                message = "Đã gửi thông báo email thành công!",
+                email = new
+                {
+                    id = newLog.Id,
+                    to = newLog.ToEmail,
+                    toName = newLog.ToName,
+                    subject = newLog.Subject,
+                    type = newLog.Type,
+                    content = newLog.Content,
+                    sentAt = newLog.SentAt
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, message = ex.Message });
+        }
+    }
 }
 
 public class SyncStateDto
@@ -802,6 +890,9 @@ public class TaskDto
     public string? Status { get; set; }
     public int Progress { get; set; }
     public string? Description { get; set; }
+    public string? ReminderTiming { get; set; }
+    public string? ReminderCustomDateTime { get; set; }
+    public bool ReminderSent { get; set; }
 }
 
 public class MeetingDto
@@ -841,6 +932,15 @@ public class EmailDto
     public string? Type { get; set; }
     public string? Content { get; set; }
     public string? SentAt { get; set; }
+}
+
+public class SendEmailRequestDto
+{
+    public string To { get; set; } = string.Empty;
+    public string? ToName { get; set; }
+    public string? Subject { get; set; }
+    public string? Type { get; set; } = "notification";
+    public string? Content { get; set; }
 }
 
 public class ActivityDto
