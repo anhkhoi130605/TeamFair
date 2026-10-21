@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_WEBAPP_NAME: "teamfair-g0fje9byb0fshvcg"    # Tên Web App thực tế của bạn trên Azure
+  AZURE_WEBAPP_NAME: "TeamFair"    # Tên Web App thực tế của bạn trên Azure
   AZURE_WEBAPP_PACKAGE_PATH: "./publish"
   DOTNET_VERSION: "10.0.x"            # Phiên bản .NET
 
