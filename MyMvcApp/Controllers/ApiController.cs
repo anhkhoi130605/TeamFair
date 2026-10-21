@@ -754,6 +754,9 @@ public class ApiController : ControllerBase
             var smtpUser = _config["EmailSettings:SmtpUser"];
             var smtpPass = _config["EmailSettings:SmtpPass"];
 
+            bool smtpSent = false;
+            string? smtpError = null;
+
             if (!string.IsNullOrEmpty(smtpHost) && !string.IsNullOrEmpty(smtpUser) && !string.IsNullOrEmpty(smtpPass))
             {
                 try
@@ -769,24 +772,28 @@ public class ApiController : ControllerBase
                     };
                     using var mailMsg = new System.Net.Mail.MailMessage
                     {
-                        From = new System.Net.Mail.MailAddress(smtpUser, "TeamFair Platform"),
+                        From = new System.Net.Mail.MailAddress(smtpUser.Trim(), "TeamFair Platform"),
                         Subject = newLog.Subject,
                         Body = newLog.Content,
                         IsBodyHtml = false
                     };
                     mailMsg.To.Add(newLog.ToEmail);
                     await client.SendMailAsync(mailMsg);
+                    smtpSent = true;
                 }
                 catch (Exception smtpEx)
                 {
-                    Console.WriteLine($"SMTP notice: {smtpEx.Message}");
+                    smtpError = smtpEx.Message;
+                    _logger.LogError(smtpEx, "Lỗi gửi email SMTP đến {Email}", newLog.ToEmail);
                 }
             }
 
             return Ok(new
             {
                 success = true,
-                message = "Đã gửi thông báo email thành công!",
+                smtpSent,
+                smtpError,
+                message = smtpSent ? "Đã gửi email SMTP thành công!" : "Đã lưu thông báo nội bộ.",
                 email = new
                 {
                     id = newLog.Id,
