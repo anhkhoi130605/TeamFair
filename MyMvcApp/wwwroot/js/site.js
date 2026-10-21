@@ -1,6 +1,7 @@
 /**
- * TeamFair - Main Application Engine (Clean Version - No Mock Data)
- * Khởi tạo dữ liệu thực tế, sẵn sàng cho người dùng tự nhập toàn bộ.
+ * TeamFair - Main Application Engine
+ * Hỗ trợ 2 Role: Nhóm Trưởng (Leader) & Thành Viên (Member) với 2 Dashboard riêng biệt.
+ * Tích hợp lưu trữ Azure SQL Database + LocalStorage offline fallback.
  */
 
 const DEFAULT_STATE = {
@@ -20,8 +21,20 @@ const DEFAULT_STATE = {
   activities: []
 };
 
+const DEFAULT_LEADER = {
+  id: "leader_root",
+  name: "Trưởng Nhóm",
+  email: "truongnhom@student.edu.vn",
+  role: "Trưởng nhóm",
+  roleType: "Leader",
+  avatar: "TN",
+  color: "#059669"
+};
+
 const TeamFairApp = {
   state: null,
+  currentUser: null,
+  selectedQuickRole: "Leader",
   activeTab: "dashboard",
   currentSchedulerMemberId: "",
   inMeeting: false,
@@ -31,10 +44,33 @@ const TeamFairApp = {
   meetingTimer: null,
   meetingSeconds: 0,
 
-  init() {
-    this.loadState();
+  async init() {
+    this.loadUserSession();
+    await this.loadState();
     this.bindEvents();
     this.renderAll();
+  },
+
+  loadUserSession() {
+    try {
+      const savedUser = localStorage.getItem("TeamFair_CurrentUser_v1");
+      if (savedUser) {
+        this.currentUser = JSON.parse(savedUser);
+      } else {
+        this.currentUser = { ...DEFAULT_LEADER };
+        this.saveUserSession();
+      }
+    } catch (e) {
+      this.currentUser = { ...DEFAULT_LEADER };
+    }
+  },
+
+  saveUserSession() {
+    try {
+      localStorage.setItem("TeamFair_CurrentUser_v1", JSON.stringify(this.currentUser));
+    } catch (e) {
+      console.error("Lỗi lưu session user:", e);
+    }
   },
 
   async loadState() {
@@ -54,10 +90,7 @@ const TeamFairApp = {
             activities: data.activities || []
           };
           this.updateDbStatus(true);
-          if (this.state.members.length > 0 && !this.currentSchedulerMemberId) {
-            this.currentSchedulerMemberId = this.state.members[0].id;
-          }
-          this.renderAll();
+          this.syncCurrentUserWithMembers();
           return;
         }
       }
@@ -85,10 +118,24 @@ const TeamFairApp = {
       this.state = JSON.parse(JSON.stringify(DEFAULT_STATE));
     }
 
-    if (this.state.members.length > 0 && !this.currentSchedulerMemberId) {
-      this.currentSchedulerMemberId = this.state.members[0].id;
+    this.syncCurrentUserWithMembers();
+  },
+
+  syncCurrentUserWithMembers() {
+    if (this.currentUser && this.currentUser.roleType === "Member") {
+      const matched = this.state.members.find(m => m.id === this.currentUser.id || m.email === this.currentUser.email);
+      if (matched) {
+        this.currentUser = { ...matched, roleType: "Member" };
+        this.saveUserSession();
+      } else if (this.state.members.length > 0) {
+        this.currentUser = { ...this.state.members[0], roleType: "Member" };
+        this.saveUserSession();
+      }
     }
-    this.renderAll();
+
+    if (this.state.members.length > 0 && !this.currentSchedulerMemberId) {
+      this.currentSchedulerMemberId = (this.currentUser && this.currentUser.id !== "leader_root") ? this.currentUser.id : this.state.members[0].id;
+    }
   },
 
   saveState() {
@@ -131,6 +178,8 @@ const TeamFairApp = {
   clearAllData() {
     if (confirm("Bạn có chắc chắn muốn xóa toàn bộ dữ liệu (thành viên, công việc, lịch họp...) để nhập lại từ đầu?")) {
       this.state = JSON.parse(JSON.stringify(DEFAULT_STATE));
+      this.currentUser = { ...DEFAULT_LEADER };
+      this.saveUserSession();
       this.currentSchedulerMemberId = "";
       this.saveState();
       this.renderAll();
@@ -139,6 +188,11 @@ const TeamFairApp = {
   },
 
   editTeamInfo() {
+    if (this.currentUser.roleType !== "Leader") {
+      alert("Chỉ có Nhóm Trưởng mới có quyền chỉnh sửa thông tin đề tài và nhóm!");
+      return;
+    }
+
     const newName = prompt("Nhập tên nhóm của bạn:", this.state.team.name || "Nhóm 01");
     if (newName !== null && newName.trim()) {
       this.state.team.name = newName.trim();
@@ -155,8 +209,154 @@ const TeamFairApp = {
     }
   },
 
+  /* ================= ROLE & AUTH CONTROLS ================= */
+  openLoginModal() {
+    this.populateMemberSelectInLoginModal();
+    this.selectRoleCard(this.currentUser.roleType || "Leader");
+    const modal = new bootstrap.Modal(document.getElementById("loginModal"));
+    modal.show();
+  },
+
+  openMemberSelectModal() {
+    this.openLoginModal();
+    this.selectRoleCard("Member");
+  },
+
+  populateMemberSelectInLoginModal() {
+    const sel = document.getElementById("loginMemberSelect");
+    if (!sel) return;
+
+    if (!this.state.members.length) {
+      sel.innerHTML = `<option value="">-- Chưa có thành viên nào trong nhóm --</option>`;
+      return;
+    }
+
+    sel.innerHTML = this.state.members.map(m => `
+      <option value="${m.id}" ${this.currentUser && this.currentUser.id === m.id ? 'selected' : ''}>
+        ${m.name} (${m.email || 'Thành viên'})
+      </option>
+    `).join("");
+  },
+
+  selectRoleCard(roleType) {
+    this.selectedQuickRole = roleType;
+    const cardLeader = document.getElementById("roleCardLeader");
+    const cardMember = document.getElementById("roleCardMember");
+
+    if (cardLeader) cardLeader.classList.toggle("selected", roleType === "Leader");
+    if (cardMember) cardMember.classList.toggle("selected", roleType === "Member");
+  },
+
+  confirmQuickRole() {
+    if (this.selectedQuickRole === "Leader") {
+      // Find designated leader member or use default leader
+      const leaderMember = this.state.members.find(m => m.roleType === "Leader" || (m.role && m.role.toLowerCase().includes("trưởng")));
+      if (leaderMember) {
+        this.currentUser = { ...leaderMember, roleType: "Leader" };
+      } else {
+        this.currentUser = { ...DEFAULT_LEADER };
+      }
+      this.saveUserSession();
+      this.showToast("Đã đăng nhập vai trò: 👑 Nhóm Trưởng (Leader)!", "success");
+    } else {
+      const selMemberId = document.getElementById("loginMemberSelect")?.value;
+      const member = this.state.members.find(m => m.id === selMemberId);
+      if (!member) {
+        if (!this.state.members.length) {
+          alert("Nhóm chưa có thành viên nào! Vui lòng vào vai trò Nhóm Trưởng để thêm thành viên trước.");
+          return;
+        }
+        this.currentUser = { ...this.state.members[0], roleType: "Member" };
+      } else {
+        this.currentUser = { ...member, roleType: "Member" };
+      }
+      this.saveUserSession();
+      this.showToast(`Đã đăng nhập vai trò: 🧑 Thành viên (${this.currentUser.name})!`, "success");
+    }
+
+    const modalEl = document.getElementById("loginModal");
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    if (modal) modal.hide();
+
+    this.renderAll();
+  },
+
+  switchRoleQuick(roleType) {
+    if (roleType === "Leader") {
+      const leaderMember = this.state.members.find(m => m.roleType === "Leader" || (m.role && m.role.toLowerCase().includes("trưởng")));
+      this.currentUser = leaderMember ? { ...leaderMember, roleType: "Leader" } : { ...DEFAULT_LEADER };
+      this.saveUserSession();
+      this.renderAll();
+      this.showToast("Đã chuyển sang Dashboard 👑 Nhóm Trưởng!", "success");
+    } else {
+      if (!this.state.members.length) {
+        alert("Chưa có thành viên nào trong nhóm! Hãy thêm thành viên trước khi đổi sang vai trò Thành viên.");
+        return;
+      }
+      this.currentUser = { ...this.state.members[0], roleType: "Member" };
+      this.saveUserSession();
+      this.renderAll();
+      this.showToast(`Đã chuyển sang Dashboard 🧑 Thành viên (${this.currentUser.name})!`, "success");
+    }
+  },
+
+  toggleCurrentRole() {
+    if (this.currentUser.roleType === "Leader") {
+      this.switchRoleQuick("Member");
+    } else {
+      this.switchRoleQuick("Leader");
+    }
+  },
+
+  handleEmailLogin() {
+    const input = document.getElementById("loginEmailInput")?.value.trim();
+    const pass = document.getElementById("loginPasswordInput")?.value.trim();
+
+    if (!input) {
+      alert("Vui lòng nhập Email hoặc Họ tên!");
+      return;
+    }
+
+    // Match against members
+    const matched = this.state.members.find(m => 
+      m.email.toLowerCase() === input.toLowerCase() || 
+      m.name.toLowerCase() === input.toLowerCase()
+    );
+
+    if (matched) {
+      const isLeader = matched.roleType === "Leader" || (matched.role && matched.role.toLowerCase().includes("trưởng"));
+      this.currentUser = { ...matched, roleType: isLeader ? "Leader" : "Member" };
+      this.saveUserSession();
+      this.showToast(`Đăng nhập thành công: ${matched.name} (${this.currentUser.roleType})`, "success");
+    } else {
+      // Allow leader login
+      if (input.toLowerCase().includes("truong") || input.toLowerCase().includes("admin") || input.toLowerCase().includes("leader")) {
+        this.currentUser = { ...DEFAULT_LEADER, name: input };
+        this.saveUserSession();
+        this.showToast("Đăng nhập thành công với vai trò 👑 Nhóm Trưởng!", "success");
+      } else {
+        alert("Không tìm thấy thành viên phù hợp trong nhóm. Đang chuyển sang vai trò Thành viên mới.");
+        this.currentUser = {
+          id: "m_guest_" + Date.now(),
+          name: input,
+          email: input.includes("@") ? input : `${input.toLowerCase().replace(/\s+/g, '')}@student.edu.vn`,
+          role: "Thành viên",
+          roleType: "Member",
+          avatar: input.substring(0, 2).toUpperCase(),
+          color: "#2563eb"
+        };
+        this.saveUserSession();
+      }
+    }
+
+    const modalEl = document.getElementById("loginModal");
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    if (modal) modal.hide();
+
+    this.renderAll();
+  },
+
   bindEvents() {
-    // Navigation Tabs
     document.querySelectorAll(".tf-tab-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         const tab = btn.getAttribute("data-tab");
@@ -164,7 +364,6 @@ const TeamFairApp = {
       });
     });
 
-    // Form Task Assignment
     const formTask = document.getElementById("formAddTask");
     if (formTask) {
       formTask.addEventListener("submit", (e) => {
@@ -173,7 +372,6 @@ const TeamFairApp = {
       });
     }
 
-    // Form Add Member
     const formMember = document.getElementById("formAddMember");
     if (formMember) {
       formMember.addEventListener("submit", (e) => {
@@ -182,7 +380,6 @@ const TeamFairApp = {
       });
     }
 
-    // Form Schedule Meeting
     const formMeeting = document.getElementById("formAddMeeting");
     if (formMeeting) {
       formMeeting.addEventListener("submit", (e) => {
@@ -323,7 +520,7 @@ const TeamFairApp = {
   },
 
   renderAll() {
-    this.renderHeaderAndBadges();
+    this.renderHeaderAndUser();
     if (this.activeTab === "dashboard") this.renderDashboard();
     if (this.activeTab === "tasks") this.renderTasks();
     if (this.activeTab === "schedule") this.renderSchedule();
@@ -333,7 +530,7 @@ const TeamFairApp = {
     if (this.activeTab === "report") this.renderReport();
   },
 
-  renderHeaderAndBadges() {
+  renderHeaderAndUser() {
     const totalTasks = this.state.tasks.length;
     const doneTasks = this.state.tasks.filter(t => t.status === "done").length;
     const unreadEmails = this.state.emails.length;
@@ -346,10 +543,80 @@ const TeamFairApp = {
 
     const elTeamName = document.getElementById("topTeamName");
     if (elTeamName) elTeamName.textContent = this.state.team.name || "Nhóm của tôi";
+
+    // User profile in Header
+    const isLeader = this.currentUser.roleType === "Leader";
+    const elUserName = document.getElementById("userNameDisplay");
+    if (elUserName) elUserName.textContent = this.currentUser.name || (isLeader ? "Trưởng Nhóm" : "Thành Viên");
+
+    const elRoleTag = document.getElementById("userRoleTag");
+    if (elRoleTag) {
+      elRoleTag.className = isLeader ? "badge bg-success" : "badge bg-primary";
+      elRoleTag.innerHTML = isLeader ? "👑 Nhóm Trưởng" : "🧑 Thành Viên";
+    }
+
+    const elAvatar = document.getElementById("userAvatarBadge");
+    if (elAvatar) {
+      elAvatar.style.backgroundColor = this.currentUser.color || (isLeader ? "#059669" : "#2563eb");
+      elAvatar.textContent = this.currentUser.avatar || (isLeader ? "TN" : "TV");
+    }
+
+    const elDDName = document.getElementById("ddUserName");
+    if (elDDName) elDDName.textContent = this.currentUser.name;
+
+    const elDDRole = document.getElementById("ddUserRole");
+    if (elDDRole) elDDRole.textContent = isLeader ? "Vai trò: Nhóm Trưởng (Leader)" : "Vai trò: Thành Viên (Member)";
+
+    const elTabTitle = document.getElementById("tabDashboardTitle");
+    if (elTabTitle) elTabTitle.textContent = isLeader ? "Dashboard Nhóm Trưởng" : "Dashboard Thành Viên";
   },
 
-  /* ------------------- DASHBOARD VIEW ------------------- */
+  /* ================= DASHBOARD RENDERING (LEADER VS MEMBER) ================= */
   renderDashboard() {
+    const isLeader = this.currentUser.roleType === "Leader";
+
+    // Switch Role Banner Info
+    const elBanner = document.getElementById("roleBanner");
+    const elIcon = document.getElementById("roleBannerIcon");
+    const elTitle = document.getElementById("roleBannerTitle");
+    const elDesc = document.getElementById("roleBannerDesc");
+    const elBtnSwitch = document.getElementById("btnSwitchOtherRole");
+
+    if (elBanner && elTitle && elDesc && elBtnSwitch) {
+      if (isLeader) {
+        elBanner.style.background = "linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%)";
+        elBanner.style.borderColor = "#bbf7d0";
+        elIcon.innerHTML = "👑";
+        elTitle.textContent = "Bảng Điều Khiển Quản Trị - Nhóm Trưởng";
+        elDesc.textContent = "Bạn đang có toàn quyền quản trị: theo dõi chỉ số công bằng nhóm, giao việc, duyệt tiến độ và nhắc nhở thành viên.";
+        elBtnSwitch.textContent = "🧑 Chuyển sang xem Dashboard Thành Viên";
+      } else {
+        elBanner.style.background = "linear-gradient(135deg, #eef2ff 0%, #fdf4ff 100%)";
+        elBanner.style.borderColor = "#c7d2fe";
+        elIcon.innerHTML = "🧑";
+        elTitle.textContent = `Không Gian Làm Việc Cá Nhân - ${this.currentUser.name}`;
+        elDesc.textContent = "Không gian dành riêng cho bạn: cập nhật tiến độ công việc được giao, chấm điểm chéo đồng đội và xếp lịch rảnh.";
+        elBtnSwitch.textContent = "👑 Chuyển sang Dashboard Nhóm Trưởng";
+      }
+    }
+
+    // Toggle View Containers
+    const leaderView = document.getElementById("dash-leader-view");
+    const memberView = document.getElementById("dash-member-view");
+
+    if (isLeader) {
+      if (leaderView) leaderView.classList.remove("d-none");
+      if (memberView) memberView.classList.add("d-none");
+      this.renderLeaderDashboard();
+    } else {
+      if (leaderView) leaderView.classList.add("d-none");
+      if (memberView) memberView.classList.remove("d-none");
+      this.renderMemberDashboard();
+    }
+  },
+
+  /* ------------------- DASHBOARD 1: LEADER ------------------- */
+  renderLeaderDashboard() {
     const { memberStats, fairnessIndex } = this.computeContributions();
     const totalTasks = this.state.tasks.length;
     const doneTasks = this.state.tasks.filter(t => t.status === "done").length;
@@ -381,14 +648,331 @@ const TeamFairApp = {
     const nextMeeting = this.state.meetings[0];
     const elNextMeeting = document.getElementById("dash-kpi-meeting");
     if (elNextMeeting) {
-      elNextMeeting.textContent = nextMeeting ? `${nextMeeting.time} - ${nextMeeting.date.split('-').reverse().slice(0, 2).join('/')}` : "Chưa có";
+      elNextMeeting.textContent = nextMeeting ? `${nextMeeting.time} - ${nextMeeting.date ? nextMeeting.date.split('-').reverse().slice(0, 2).join('/') : ''}` : "Chưa có";
     }
 
+    const unfinishedTasks = this.state.tasks.filter(t => t.status !== "done");
+    const elUrgentCount = document.getElementById("leader-urgent-count");
+    if (elUrgentCount) elUrgentCount.textContent = `${unfinishedTasks.length} việc`;
+
     this.renderContributionChart(memberStats);
+    this.renderLeaderApprovalQueue();
     this.renderUrgentDeadlines();
     this.renderActivityFeed();
   },
 
+  renderLeaderApprovalQueue() {
+    const container = document.getElementById("leader-approval-queue");
+    const badge = document.getElementById("leader-review-badge");
+    if (!container) return;
+
+    const reviewTasks = this.state.tasks.filter(t => t.status === "review" || (t.progress >= 90 && t.status !== "done"));
+    if (badge) badge.textContent = `${reviewTasks.length} việc`;
+
+    if (!reviewTasks.length) {
+      container.innerHTML = `<div class="p-4 text-center text-muted small">Hiện không có công việc nào đang chờ duyệt nghiệm thu.</div>`;
+      return;
+    }
+
+    container.innerHTML = reviewTasks.map(t => {
+      const assignee = this.state.members.find(m => m.id === t.assigneeId) || { name: "Thành viên", avatar: "??" };
+      return `
+        <div class="d-flex align-items-center justify-content-between p-3 border-bottom">
+          <div>
+            <div class="fw-semibold text-slate-900">${t.title}</div>
+            <div class="small text-muted">Người làm: <strong>${assignee.name}</strong> • Tiến độ: <span class="badge bg-warning text-dark">${t.progress}%</span></div>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-success text-white" onclick="TeamFairApp.approveTaskByLeader('${t.id}')">
+              ✓ Duyệt xong
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="TeamFairApp.openReviewModal('${t.id}')">
+              ⭐ Chấm điểm chéo
+            </button>
+          </div>
+        </div>
+      `;
+    }).join("");
+  },
+
+  approveTaskByLeader(taskId) {
+    const task = this.state.tasks.find(t => t.id === taskId);
+    if (!task) return;
+    task.status = "done";
+    task.progress = 100;
+    this.state.activities.unshift({
+      time: "Vừa xong",
+      text: `Trưởng nhóm đã phê duyệt hoàn thành nhiệm vụ: '${task.title}'`,
+      type: "task"
+    });
+    this.saveState();
+    this.renderAll();
+    this.showToast(`Đã duyệt hoàn thành công việc "${task.title}"!`, "success");
+  },
+
+  /* ------------------- DASHBOARD 2: MEMBER ------------------- */
+  renderMemberDashboard() {
+    const memberId = this.currentUser.id;
+    const myTasks = this.state.tasks.filter(t => t.assigneeId === memberId);
+    const myDoneTasks = myTasks.filter(t => t.status === "done");
+
+    // Compute personal contribution
+    const { memberStats } = this.computeContributions();
+    const myStat = memberStats[memberId] || { percentage: "0.0", finalPoints: 0, qualityMultiplier: 1.0, avgScore: "Chưa có" };
+
+    // KPI 1: My Tasks
+    const elMyTasks = document.getElementById("member-kpi-tasks");
+    if (elMyTasks) elMyTasks.textContent = `${myTasks.length} việc`;
+
+    const elMyStatus = document.getElementById("member-kpi-task-status");
+    if (elMyStatus) elMyStatus.textContent = `${myDoneTasks.length} việc đã xong`;
+
+    // KPI 2: Contribution
+    const elContrib = document.getElementById("member-kpi-contribution");
+    if (elContrib) elContrib.textContent = `${myStat.percentage}%`;
+
+    const elPoints = document.getElementById("member-kpi-points");
+    if (elPoints) elPoints.textContent = `${myStat.finalPoints.toFixed(1)} điểm tích lũy`;
+
+    // KPI 3: Peer Rating
+    const elRating = document.getElementById("member-kpi-rating");
+    if (elRating) elRating.textContent = `${myStat.avgScore} ⭐`;
+
+    const elMult = document.getElementById("member-kpi-quality-mult");
+    if (elMult) elMult.textContent = `Hệ số chất lượng: x${myStat.qualityMultiplier.toFixed(2)}`;
+
+    // KPI 4: Meeting
+    const nextMeeting = this.state.meetings[0];
+    const elMeeting = document.getElementById("member-kpi-meeting");
+    if (elMeeting) {
+      elMeeting.textContent = nextMeeting ? `${nextMeeting.time} - ${nextMeeting.date ? nextMeeting.date.split('-').reverse().slice(0, 2).join('/') : ''}` : "Chưa có";
+    }
+
+    // List 1: My Tasks
+    this.renderMemberMyTasks(myTasks);
+
+    // List 2: Pending Reviews for Member
+    this.renderMemberPendingReviews(memberId);
+
+    // List 3: Quick Schedule for Member
+    this.renderMemberQuickSchedule(memberId);
+
+    // List 4: Personal Emails
+    this.renderMemberPersonalEmails(this.currentUser.email);
+  },
+
+  renderMemberMyTasks(myTasks) {
+    const container = document.getElementById("member-my-tasks-list");
+    if (!container) return;
+
+    if (!myTasks.length) {
+      container.innerHTML = `
+        <div class="p-5 text-center text-muted">
+          <div class="fs-1 mb-2">🎉</div>
+          <div class="fw-semibold">Bạn chưa có công việc nào được phân công.</div>
+          <div class="small mt-1">Trưởng nhóm sẽ phân chia đầu việc cho bạn sớm nhất.</div>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = myTasks.map(t => {
+      const diff = this.getDifficultyLabel(t.difficulty);
+      const st = this.getStatusInfo(t.status);
+
+      return `
+        <div class="card mb-3 border shadow-sm">
+          <div class="card-body p-3">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div class="d-flex align-items-center gap-2">
+                <span class="badge ${st.badge}">${st.label}</span>
+                <span class="badge ${diff.badge}">${diff.label}</span>
+                <span class="badge bg-light text-slate-700 border">${t.category || "Công việc"}</span>
+              </div>
+              <span class="small text-muted">Hạn: <strong>${t.deadline ? t.deadline.split('-').reverse().join('/') : "Chưa đặt"}</strong></span>
+            </div>
+
+            <h6 class="fw-bold text-slate-900 mb-1">${t.title}</h6>
+            <p class="text-muted small mb-3">${t.description || "Không có mô tả chi tiết."}</p>
+
+            <div class="bg-light p-2 rounded-3 mb-3">
+              <div class="d-flex justify-content-between small text-muted mb-1">
+                <span>Tiến độ thực hiện của bạn:</span>
+                <strong class="text-primary">${t.progress}%</strong>
+              </div>
+              <div class="progress" style="height: 8px;">
+                <div class="progress-bar ${t.progress === 100 ? 'bg-success' : 'bg-primary'}" style="width: ${t.progress}%;"></div>
+              </div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <div class="btn-group btn-group-sm" role="group">
+                <button type="button" class="btn btn-outline-secondary ${t.progress === 0 ? 'active' : ''}" onclick="TeamFairApp.setMemberTaskProgress('${t.id}', 0)">0%</button>
+                <button type="button" class="btn btn-outline-secondary ${t.progress === 50 ? 'active' : ''}" onclick="TeamFairApp.setMemberTaskProgress('${t.id}', 50)">50%</button>
+                <button type="button" class="btn btn-outline-secondary ${t.progress === 80 ? 'active' : ''}" onclick="TeamFairApp.setMemberTaskProgress('${t.id}', 80)">80%</button>
+                <button type="button" class="btn btn-outline-success ${t.progress === 100 ? 'active' : ''}" onclick="TeamFairApp.setMemberTaskProgress('${t.id}', 100)">100% (Xong)</button>
+              </div>
+
+              <div>
+                ${t.status !== 'done' ? `
+                  <button class="btn btn-sm btn-warning text-dark fw-semibold" onclick="TeamFairApp.submitTaskForReview('${t.id}')">
+                    📤 Báo cáo nộp / Gửi duyệt
+                  </button>
+                ` : `
+                  <span class="text-success small fw-semibold">✓ Đã hoàn thành</span>
+                `}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join("");
+  },
+
+  setMemberTaskProgress(taskId, progressVal) {
+    const task = this.state.tasks.find(t => t.id === taskId);
+    if (!task) return;
+    task.progress = progressVal;
+    if (progressVal === 100) task.status = "done";
+    else if (progressVal > 0) task.status = "doing";
+    else task.status = "todo";
+
+    this.state.activities.unshift({
+      time: "Vừa xong",
+      text: `${this.currentUser.name} đã cập nhật tiến độ việc '${task.title}' lên ${progressVal}%`,
+      type: "task"
+    });
+
+    this.saveState();
+    this.renderAll();
+    this.showToast(`Đã cập nhật tiến độ ${progressVal}%!`, "success");
+  },
+
+  submitTaskForReview(taskId) {
+    const task = this.state.tasks.find(t => t.id === taskId);
+    if (!task) return;
+    task.status = "review";
+    if (task.progress < 90) task.progress = 90;
+
+    this.state.activities.unshift({
+      time: "Vừa xong",
+      text: `${this.currentUser.name} đã nộp kết quả công việc '${task.title}' và chuyển sang Chờ nghiệm thu.`,
+      type: "task"
+    });
+
+    this.saveState();
+    this.renderAll();
+    this.showToast(`Đã chuyển công việc "${task.title}" sang trạng thái Chờ nghiệm thu!`, "info");
+  },
+
+  renderMemberPendingReviews(memberId) {
+    const container = document.getElementById("member-pending-reviews-list");
+    const countBadge = document.getElementById("member-pending-review-count");
+    if (!container) return;
+
+    // Tasks of OTHER members that are in review or done
+    const otherTasks = this.state.tasks.filter(t => t.assigneeId !== memberId && (t.status === "review" || t.status === "done"));
+    // Filter out tasks already reviewed by this member
+    const unreviewedTasks = otherTasks.filter(t => !this.state.reviews.some(r => r.taskId === t.id && r.reviewerId === memberId));
+
+    if (countBadge) countBadge.textContent = unreviewedTasks.length;
+
+    if (!unreviewedTasks.length) {
+      container.innerHTML = `<div class="p-4 text-center text-muted small">Tuyệt vời! Bạn không có đánh giá chéo nào còn tồn đọng.</div>`;
+      return;
+    }
+
+    container.innerHTML = unreviewedTasks.map(t => {
+      const assignee = this.state.members.find(m => m.id === t.assigneeId) || { name: "Đồng đội", avatar: "??" };
+      return `
+        <div class="p-3 border-bottom">
+          <div class="fw-semibold text-slate-900 small mb-1">${t.title}</div>
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="small text-muted">Làm bởi: <strong class="text-primary">${assignee.name}</strong></span>
+            <button class="btn btn-sm btn-tf-indigo text-white py-1" onclick="TeamFairApp.openReviewModal('${t.id}')">
+              ⭐ Chấm điểm
+            </button>
+          </div>
+        </div>
+      `;
+    }).join("");
+  },
+
+  renderMemberQuickSchedule(memberId) {
+    const container = document.getElementById("member-quick-schedule-container");
+    if (!container) return;
+
+    const days = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ Nhật"];
+    const shifts = [
+      { name: "Sáng", id: 0 },
+      { name: "Chiều", id: 1 },
+      { name: "Tối", id: 2 }
+    ];
+
+    const mySlots = this.state.schedules[memberId] || [];
+
+    let html = `
+      <div class="table-responsive">
+        <table class="table table-bordered text-center align-middle mb-0" style="font-size: 0.8rem;">
+          <thead class="table-light">
+            <tr>
+              <th style="width: 70px;">Ca</th>
+              ${days.map(d => `<th>${d}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    shifts.forEach(shift => {
+      html += `<tr><td class="fw-semibold bg-light">${shift.name}</td>`;
+      days.forEach((day, dayIndex) => {
+        const slotKey = `${dayIndex}_${shift.id}`;
+        const isFree = mySlots.includes(slotKey);
+        html += `
+          <td class="cursor-pointer ${isFree ? 'bg-success-subtle text-success fw-bold' : 'text-muted'}" 
+              onclick="TeamFairApp.toggleScheduleSlot('${slotKey}')" 
+              style="cursor: pointer; height: 38px;">
+            ${isFree ? '✓ Rảnh' : '—'}
+          </td>
+        `;
+      });
+      html += `</tr>`;
+    });
+
+    html += `</tbody></table></div>`;
+    container.innerHTML = html;
+  },
+
+  renderMemberPersonalEmails(myEmail) {
+    const container = document.getElementById("member-personal-emails-list");
+    if (!container) return;
+
+    const personalEmails = this.state.emails.filter(e => 
+      e.to.toLowerCase() === (myEmail || "").toLowerCase() || 
+      e.to.toLowerCase().includes("all")
+    );
+
+    if (!personalEmails.length) {
+      container.innerHTML = `<div class="p-4 text-center text-muted small">Chưa có thông báo nào gửi riêng cho bạn.</div>`;
+      return;
+    }
+
+    container.innerHTML = personalEmails.map(em => `
+      <div class="p-2 mb-2 bg-light rounded-3 border">
+        <div class="d-flex justify-content-between small text-muted mb-1">
+          <span class="badge bg-primary text-white" style="font-size: 0.65rem;">${em.type}</span>
+          <span style="font-size: 0.75rem;">${em.sentAt}</span>
+        </div>
+        <div class="fw-semibold text-slate-900 small mb-1">${em.subject}</div>
+        <div class="small text-muted text-truncate">${em.content}</div>
+        <div class="text-end mt-1">
+          <button class="btn btn-link p-0 small text-decoration-none" onclick="TeamFairApp.previewEmailModal('${em.id}')">Xem chi tiết ➔</button>
+        </div>
+      </div>
+    `).join("");
+  },
+
+  /* ------------------- COMMON WIDGETS ------------------- */
   renderContributionChart(memberStats) {
     const container = document.getElementById("dash-chart-container");
     if (!container) return;
@@ -418,8 +1002,8 @@ const TeamFairApp = {
             <div class="d-flex align-items-center gap-2">
               <span class="tf-avatar" style="background-color: ${m.color}; width: 28px; height: 28px; font-size: 0.75rem;">${m.avatar}</span>
               <strong class="text-slate-800" style="font-size: 0.9rem;">${m.name}</strong>
-              <span class="badge bg-secondary-subtle text-secondary" style="font-size: 0.7rem;">
-                ${stat.completedTasks}/${stat.totalTasks} việc
+              <span class="badge ${m.roleType === 'Leader' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'}" style="font-size: 0.7rem;">
+                ${m.roleType === 'Leader' ? '👑 Trưởng nhóm' : 'Thành viên'}
               </span>
             </div>
             <div class="text-end">
@@ -453,7 +1037,7 @@ const TeamFairApp = {
               100% Khách quan
             </div>
             <div class="small text-slate-500">
-              Không cần tự cãi vã chia điểm. Hệ số minh bạch qua từng đầu việc & đánh giá chéo.
+              Không ai phải tự cãi vã chia điểm. Hệ số minh bạch qua từng đầu việc & đánh giá chéo.
             </div>
           </div>
         </div>
@@ -531,7 +1115,7 @@ const TeamFairApp = {
     `).join("");
   },
 
-  /* ------------------- TASKS & KANBAN VIEW ------------------- */
+  /* ------------------- TASKS VIEW ------------------- */
   renderTasks() {
     const selAssignee = document.getElementById("taskAssignee");
     if (selAssignee) {
@@ -539,7 +1123,7 @@ const TeamFairApp = {
         selAssignee.innerHTML = `<option value="">-- Chưa có thành viên nào --</option>`;
       } else {
         selAssignee.innerHTML = `<option value="">-- Chọn thành viên phụ trách --</option>` +
-          this.state.members.map(m => `<option value="${m.id}">${m.name} (${m.role})</option>`).join("");
+          this.state.members.map(m => `<option value="${m.id}" ${this.currentUser.roleType === 'Member' && this.currentUser.id === m.id ? 'selected' : ''}>${m.name} (${m.role})</option>`).join("");
       }
     }
 
@@ -547,6 +1131,11 @@ const TeamFairApp = {
     if (filterMember) {
       filterMember.innerHTML = `<option value="all">Tất cả thành viên</option>` +
         this.state.members.map(m => `<option value="${m.id}">${m.name}</option>`).join("");
+    }
+
+    const roleNote = document.getElementById("memberRoleAccessNote");
+    if (roleNote) {
+      roleNote.textContent = this.currentUser.roleType === "Leader" ? "Quyền quản trị (Nhóm Trưởng)" : "Chế độ Thành viên";
     }
 
     this.renderTaskList();
@@ -562,6 +1151,8 @@ const TeamFairApp = {
       return;
     }
 
+    const isLeader = this.currentUser.roleType === "Leader";
+
     container.innerHTML = this.state.members.map(m => {
       const taskCount = this.state.tasks.filter(t => t.assigneeId === m.id).length;
       return `
@@ -569,13 +1160,18 @@ const TeamFairApp = {
           <div class="d-flex align-items-center gap-2">
             <span class="tf-avatar" style="background-color: ${m.color}; width: 32px; height: 32px; font-size: 0.75rem;">${m.avatar}</span>
             <div>
-              <div class="fw-bold text-slate-800" style="font-size: 0.875rem;">${m.name}</div>
+              <div class="fw-bold text-slate-800" style="font-size: 0.875rem;">
+                ${m.name}
+                ${m.roleType === 'Leader' ? '<span class="badge bg-success" style="font-size: 0.65rem;">👑 Trưởng nhóm</span>' : ''}
+              </div>
               <div class="text-muted" style="font-size: 0.75rem;">${m.email || 'Chưa có email'} • <em>${m.role}</em></div>
             </div>
           </div>
           <div class="d-flex align-items-center gap-2">
-            <span class="badge bg-white text-slate-700 border" style="font-size: 0.75rem;">${taskCount} công việc</span>
-            <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="TeamFairApp.handleRemoveMember('${m.id}')" title="Xóa thành viên">×</button>
+            <span class="badge bg-white text-slate-700 border" style="font-size: 0.75rem;">${taskCount} việc</span>
+            ${isLeader ? `
+              <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="TeamFairApp.handleRemoveMember('${m.id}')" title="Xóa thành viên">×</button>
+            ` : ''}
           </div>
         </div>
       `;
@@ -598,23 +1194,27 @@ const TeamFairApp = {
       return;
     }
 
+    const isLeader = this.currentUser.roleType === "Leader";
+
     container.innerHTML = tasks.map(t => {
       const assignee = this.state.members.find(m => m.id === t.assigneeId) || { name: "Chưa giao", color: "#64748b", avatar: "??" };
       const diff = this.getDifficultyLabel(t.difficulty);
       const st = this.getStatusInfo(t.status);
+      const isMyTask = t.assigneeId === this.currentUser.id;
 
       return `
-        <div class="card mb-3 border shadow-sm">
+        <div class="card mb-3 border shadow-sm ${isMyTask ? 'border-primary' : ''}">
           <div class="card-body p-3">
             <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
               <div class="d-flex align-items-center gap-2">
                 <span class="badge ${st.badge}">${st.label}</span>
                 <span class="badge ${diff.badge}">${diff.label}</span>
                 <span class="badge bg-light text-slate-600 border">${t.category || "Công việc"}</span>
+                ${isMyTask ? '<span class="badge bg-primary-subtle text-primary fw-bold">📌 Việc của bạn</span>' : ''}
               </div>
               <div class="d-flex align-items-center gap-2">
                 <span class="text-muted small">Hạn: <strong>${t.deadline ? t.deadline.split('-').reverse().join('/') : "Chưa đặt"}</strong></span>
-                <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="TeamFairApp.handleDeleteTask('${t.id}')">×</button>
+                ${isLeader ? `<button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="TeamFairApp.handleDeleteTask('${t.id}')">×</button>` : ''}
               </div>
             </div>
 
@@ -637,13 +1237,15 @@ const TeamFairApp = {
               </div>
               <div class="col-md-4 text-md-end d-flex justify-content-md-end gap-1 flex-wrap">
                 <button class="btn btn-sm btn-light border py-1" onclick="TeamFairApp.quickUpdateProgress('${t.id}')">
-                  📊 Cập nhật %
+                  📊 Tiến độ
                 </button>
-                <button class="btn btn-sm btn-light border py-1" onclick="TeamFairApp.sendTaskReminderEmail('${t.id}')">
-                  ✉️ Nhắc nhở
-                </button>
+                ${isLeader ? `
+                  <button class="btn btn-sm btn-light border py-1" onclick="TeamFairApp.sendTaskReminderEmail('${t.id}')">
+                    ✉️ Nhắc
+                  </button>
+                ` : ''}
                 <button class="btn btn-sm btn-tf-indigo py-1 text-white" onclick="TeamFairApp.openReviewModal('${t.id}')">
-                  ⭐ Đánh giá chéo
+                  ⭐ Đánh giá
                 </button>
               </div>
             </div>
@@ -690,7 +1292,7 @@ const TeamFairApp = {
 
     this.state.activities.unshift({
       time: "Vừa xong",
-      text: `Đã giao nhiệm vụ mới: '${title}' cho ${assignee ? assignee.name : 'thành viên'}.`,
+      text: `${this.currentUser.name} đã giao nhiệm vụ mới: '${title}' cho ${assignee ? assignee.name : 'thành viên'}.`,
       type: "task"
     });
 
@@ -713,9 +1315,16 @@ const TeamFairApp = {
   },
 
   handleAddMember() {
+    if (this.currentUser.roleType !== "Leader") {
+      alert("Chỉ có Nhóm Trưởng mới có quyền thêm thành viên vào nhóm!");
+      return;
+    }
+
     const name = document.getElementById("memberName")?.value.trim();
     const email = document.getElementById("memberEmail")?.value.trim();
     const role = document.getElementById("memberRole")?.value.trim() || "Thành viên";
+    const roleType = document.getElementById("memberRoleTypeSelect")?.value || "Member";
+    const password = document.getElementById("memberPasswordInput")?.value.trim() || "123456";
 
     if (!name) {
       alert("Vui lòng nhập họ và tên thành viên!");
@@ -731,6 +1340,8 @@ const TeamFairApp = {
       name,
       email: email || `${name.toLowerCase().replace(/\s+/g, '')}@student.edu.vn`,
       role,
+      roleType,
+      password,
       avatar: initials,
       color: randomColor
     };
@@ -744,13 +1355,13 @@ const TeamFairApp = {
 
     this.state.activities.unshift({
       time: "Vừa xong",
-      text: `Đã thêm thành viên mới: ${name} (${role}) vào nhóm.`,
+      text: `Đã thêm thành viên mới: ${name} (${roleType === 'Leader' ? '👑 Trưởng nhóm' : 'Thành viên'}).`,
       type: "member"
     });
 
     this.saveState();
     this.renderAll();
-    this.showToast(`Đã thêm thành viên ${name} vào nhóm!`, "success");
+    this.showToast(`Đã thêm thành viên ${name} (${roleType}) vào nhóm!`, "success");
 
     document.getElementById("memberName").value = "";
     if (document.getElementById("memberEmail")) document.getElementById("memberEmail").value = "";
@@ -758,13 +1369,14 @@ const TeamFairApp = {
   },
 
   handleRemoveMember(id) {
+    if (this.currentUser.roleType !== "Leader") {
+      alert("Chỉ có Nhóm Trưởng mới có quyền xóa thành viên!");
+      return;
+    }
     const m = this.state.members.find(x => x.id === id);
     if (confirm(`Bạn có chắc muốn xóa thành viên ${m?.name} khỏi nhóm không?`)) {
       this.state.members = this.state.members.filter(x => x.id !== id);
       delete this.state.schedules[id];
-      if (this.currentSchedulerMemberId === id) {
-        this.currentSchedulerMemberId = this.state.members[0] ? this.state.members[0].id : "";
-      }
       this.saveState();
       this.renderAll();
       this.showToast("Đã xóa thành viên khỏi nhóm.", "info");
@@ -772,6 +1384,10 @@ const TeamFairApp = {
   },
 
   handleDeleteTask(id) {
+    if (this.currentUser.roleType !== "Leader") {
+      alert("Chỉ có Nhóm Trưởng mới có quyền xóa đầu việc!");
+      return;
+    }
     if (confirm("Bạn có chắc muốn xóa đầu việc này không?")) {
       this.state.tasks = this.state.tasks.filter(t => t.id !== id);
       this.saveState();
@@ -806,7 +1422,7 @@ const TeamFairApp = {
     }
   },
 
-  /* ------------------- SCHEDULE / LỊCH RẢNH VIEW ------------------- */
+  /* ------------------- SCHEDULE VIEW ------------------- */
   renderSchedule() {
     const selMember = document.getElementById("schedulerMemberSelect");
     const container = document.getElementById("scheduleTableContainer");
@@ -821,9 +1437,6 @@ const TeamFairApp = {
             <div class="fs-1 mb-2">🗓️</div>
             <div class="fw-semibold">Chưa có thành viên nào trong nhóm.</div>
             <div class="small mt-1">Vui lòng thêm các thành viên trước để bắt đầu xếp lịch rảnh và tìm giờ họp chung.</div>
-            <button class="btn btn-sm btn-primary mt-3" onclick="TeamFairApp.switchTab('tasks')">
-              ➔ Thêm thành viên nhóm
-            </button>
           </div>
         `;
       }
@@ -831,7 +1444,7 @@ const TeamFairApp = {
     }
 
     if (!this.currentSchedulerMemberId || !this.state.members.find(m => m.id === this.currentSchedulerMemberId)) {
-      this.currentSchedulerMemberId = this.state.members[0].id;
+      this.currentSchedulerMemberId = (this.currentUser && this.currentUser.id !== "leader_root" && this.state.members.find(m => m.id === this.currentUser.id)) ? this.currentUser.id : this.state.members[0].id;
     }
 
     if (selMember) {
@@ -918,12 +1531,7 @@ const TeamFairApp = {
       html += `</tr>`;
     });
 
-    html += `
-          </tbody>
-        </table>
-      </div>
-    `;
-
+    html += `</tbody></table></div>`;
     if (container) container.innerHTML = html;
 
     if (goldenBox) {
@@ -942,7 +1550,7 @@ const TeamFairApp = {
       } else {
         goldenBox.innerHTML = `
           <div class="alert alert-warning p-3 mb-0">
-            <strong>⚠️ Chưa có khung giờ nào 100% thành viên cùng rảnh.</strong> Bạn hãy bấm vào các ô khung giờ trên để cập nhật giờ rảnh cá nhân!
+            <strong>⚠️ Chưa có khung giờ nào 100% thành viên cùng rảnh.</strong> Hãy bấm vào các ô trên để cập nhật giờ rảnh cá nhân!
           </div>
         `;
       }
@@ -950,16 +1558,18 @@ const TeamFairApp = {
   },
 
   toggleScheduleSlot(slotKey) {
-    if (!this.currentSchedulerMemberId) return;
-    let slots = this.state.schedules[this.currentSchedulerMemberId] || [];
+    const targetMemberId = (this.currentUser.roleType === "Member" && this.currentUser.id !== "leader_root") ? this.currentUser.id : this.currentSchedulerMemberId;
+    if (!targetMemberId) return;
+
+    let slots = this.state.schedules[targetMemberId] || [];
     if (slots.includes(slotKey)) {
       slots = slots.filter(s => s !== slotKey);
     } else {
       slots.push(slotKey);
     }
-    this.state.schedules[this.currentSchedulerMemberId] = slots;
+    this.state.schedules[targetMemberId] = slots;
     this.saveState();
-    this.renderSchedule();
+    this.renderAll();
     this.showToast("Đã cập nhật lịch rảnh!", "info");
   },
 
@@ -969,7 +1579,7 @@ const TeamFairApp = {
     if (titleInput) titleInput.value = `Họp nhóm định kỳ (${day} - ${shift})`;
   },
 
-  /* ------------------- MEETING ROOM / PHÒNG HỌP VIEW ------------------- */
+  /* ------------------- MEETING VIEW ------------------- */
   renderMeeting() {
     const listContainer = document.getElementById("meetingsListContainer");
     if (!listContainer) return;
@@ -1048,7 +1658,7 @@ const TeamFairApp = {
 
     this.state.activities.unshift({
       time: "Vừa xong",
-      text: `Đã tạo cuộc họp mới: '${title}' và gửi thư mời email cho nhóm.`,
+      text: `${this.currentUser.name} đã tạo cuộc họp mới: '${title}' và gửi thư mời email cho nhóm.`,
       type: "meeting"
     });
 
@@ -1083,10 +1693,10 @@ const TeamFairApp = {
           <div class="tf-video-box active-speaker" style="grid-column: 1 / -1;">
             <div class="text-center text-white p-4">
               <div class="fs-1 mb-2">📹</div>
-              <div class="fw-bold">Bạn đang ở trong phòng họp một mình</div>
-              <div class="text-muted small mt-1">Hãy thêm thành viên để hiển thị luồng video của nhóm.</div>
+              <div class="fw-bold">${this.currentUser.name} (Đang trực tuyến)</div>
+              <div class="text-muted small mt-1">Phòng họp ảo đang sẵn sàng.</div>
             </div>
-            <div class="tf-video-name">Bạn (Chủ phòng)</div>
+            <div class="tf-video-name">${this.currentUser.name}</div>
           </div>
         `;
       } else {
@@ -1157,14 +1767,14 @@ const TeamFairApp = {
     if (chatBox) {
       const bubble = document.createElement("div");
       bubble.className = "mb-2 p-2 rounded bg-primary-subtle text-primary-emphasis small";
-      bubble.innerHTML = `<strong>Bạn:</strong> ${msg}`;
+      bubble.innerHTML = `<strong>${this.currentUser.name}:</strong> ${msg}`;
       chatBox.appendChild(bubble);
       chatBox.scrollTop = chatBox.scrollHeight;
     }
     input.value = "";
   },
 
-  /* ------------------- PEER REVIEWS / ĐÁNH GIÁ CHÉO VIEW ------------------- */
+  /* ------------------- PEER REVIEWS VIEW ------------------- */
   renderReviews() {
     const listContainer = document.getElementById("reviewsListContainer");
     if (!listContainer) return;
@@ -1226,7 +1836,11 @@ const TeamFairApp = {
       if (candidates.length === 0) {
         selReviewer.innerHTML = `<option value="">-- Cần ít nhất 2 thành viên trong nhóm để đánh giá chéo --</option>`;
       } else {
-        selReviewer.innerHTML = candidates.map(m => `<option value="${m.id}">${m.name} (${m.role})</option>`).join("");
+        selReviewer.innerHTML = candidates.map(m => `
+          <option value="${m.id}" ${this.currentUser && this.currentUser.id === m.id ? 'selected' : ''}>
+            ${m.name} (${m.role})
+          </option>
+        `).join("");
       }
     }
 
@@ -1457,7 +2071,7 @@ const TeamFairApp = {
     modal.show();
   },
 
-  /* ------------------- REPORT VIEW (XUẤT BÁO CÁO NỘP KÈM BÀI) ------------------- */
+  /* ------------------- REPORT VIEW ------------------- */
   renderReport() {
     const { memberStats } = this.computeContributions();
 
@@ -1472,6 +2086,12 @@ const TeamFairApp = {
 
     const elRepClass = document.getElementById("repClass");
     if (elRepClass) elRepClass.textContent = this.state.team.classCode || "(Chưa nhập lớp)";
+
+    const elLeaderSig = document.getElementById("repLeaderSignature");
+    if (elLeaderSig) {
+      const leaderMember = this.state.members.find(m => m.roleType === "Leader" || (m.role && m.role.toLowerCase().includes("trưởng")));
+      elLeaderSig.innerHTML = `<strong>${leaderMember ? leaderMember.name : (this.currentUser.roleType === 'Leader' ? this.currentUser.name : 'Trưởng nhóm')}</strong><br><span class="text-success small">✓ Đã xác nhận điện tử</span>`;
+    }
 
     const tableContainer = document.getElementById("repMembersTableBody");
     if (tableContainer) {

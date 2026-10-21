@@ -134,3 +134,14 @@ VALUES (N'20261021070815_InitialCreate', N'10.0.13');
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+ALTER TABLE [TeamMembers] ADD [Password] nvarchar(100) NOT NULL DEFAULT N'';
+
+ALTER TABLE [TeamMembers] ADD [RoleType] nvarchar(50) NOT NULL DEFAULT N'';
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20261021073210_AddMemberRoleAndPassword', N'10.0.13');
+
+COMMIT;
+GO
+

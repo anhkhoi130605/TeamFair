@@ -93,6 +93,7 @@ public class ApiController : ControllerBase
                     name = m.Name,
                     email = m.Email,
                     role = m.Role,
+                    roleType = string.Equals(m.RoleType, "Leader", StringComparison.OrdinalIgnoreCase) || (m.Role != null && m.Role.Contains("trưởng", StringComparison.OrdinalIgnoreCase)) ? "Leader" : "Member",
                     avatar = m.Avatar,
                     color = m.Color
                 }),
@@ -197,6 +198,8 @@ public class ApiController : ControllerBase
                         Name = m.Name,
                         Email = m.Email ?? "",
                         Role = m.Role ?? "Thành viên",
+                        RoleType = !string.IsNullOrEmpty(m.RoleType) ? m.RoleType : ((m.Role != null && m.Role.Contains("trưởng", StringComparison.OrdinalIgnoreCase)) ? "Leader" : "Member"),
+                        Password = !string.IsNullOrEmpty(m.Password) ? m.Password : "123456",
                         Avatar = m.Avatar ?? "TV",
                         Color = m.Color ?? "#2563eb"
                     };
@@ -365,6 +368,8 @@ public class MemberDto
     public string Name { get; set; } = string.Empty;
     public string? Email { get; set; }
     public string? Role { get; set; }
+    public string? RoleType { get; set; }
+    public string? Password { get; set; }
     public string? Avatar { get; set; }
     public string? Color { get; set; }
 }

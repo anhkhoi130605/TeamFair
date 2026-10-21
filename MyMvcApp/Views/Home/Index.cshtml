@@ -19,15 +19,52 @@
         </div>
 
         <div class="d-flex align-items-center gap-2 flex-wrap mt-2 mt-md-0">
+            <!-- Team Info Badge -->
             <div class="px-3 py-1 bg-light rounded-3 border d-flex align-items-center gap-2">
                 <span class="small text-muted">Nhóm:</span>
                 <strong class="text-slate-900 small" id="topTeamName">Nhóm của tôi</strong>
                 <button class="btn btn-sm btn-link p-0 text-decoration-none" onclick="TeamFairApp.editTeamInfo()" title="Chỉnh sửa thông tin nhóm">✏️</button>
             </div>
 
+            <!-- Azure SQL Live Badge -->
             <span id="dbStatusBadge" class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" style="font-size: 0.75rem;">
-                🟢 Azure SQL: Đang kết nối...
+                🟢 Azure SQL: Đã kết nối
             </span>
+
+            <!-- User Profile & Role Switcher -->
+            <div class="dropdown">
+                <button class="btn btn-sm btn-light border dropdown-toggle d-flex align-items-center gap-2 fw-semibold px-2 py-1" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="userRoleBtn">
+                    <span id="userAvatarBadge" class="tf-avatar" style="width: 24px; height: 24px; font-size: 0.7rem; background-color: #059669;">TN</span>
+                    <span id="userNameDisplay">Trưởng Nhóm</span>
+                    <span id="userRoleTag" class="badge bg-success" style="font-size: 0.7rem;">👑 Trưởng Nhóm</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow-sm border p-2" style="min-width: 240px;">
+                    <li class="p-2 border-bottom mb-2">
+                        <div class="small text-muted">Đang đăng nhập:</div>
+                        <strong class="text-slate-900" id="ddUserName">Trưởng Nhóm</strong>
+                        <div class="small text-muted" id="ddUserRole">Vai trò: Nhóm Trưởng (Leader)</div>
+                    </li>
+                    <li>
+                        <a class="dropdown-item rounded-2 py-2 small d-flex align-items-center gap-2" href="javascript:void(0)" onclick="TeamFairApp.switchRoleQuick('Leader')">
+                            <span>👑</span>
+                            <span>Đổi sang: <strong>Nhóm Trưởng</strong></span>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item rounded-2 py-2 small d-flex align-items-center gap-2" href="javascript:void(0)" onclick="TeamFairApp.openMemberSelectModal()">
+                            <span>🧑</span>
+                            <span>Đổi sang: <strong>Thành Viên</strong></span>
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a class="dropdown-item rounded-2 py-2 small d-flex align-items-center gap-2 text-primary" href="javascript:void(0)" onclick="TeamFairApp.openLoginModal()">
+                            <span>🔑</span>
+                            <span>Hộp thoại Đăng Nhập / Phân Quyền</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
 
             <button class="btn btn-sm btn-outline-danger" onclick="TeamFairApp.clearAllData()" title="Xóa toàn bộ dữ liệu để nhập lại từ đầu">
                 🗑️ Xóa làm mới
@@ -42,7 +79,7 @@
     <nav class="tf-nav-tabs mb-4">
         <button class="tf-tab-btn active" data-tab="dashboard">
             <span>📊</span>
-            <span>Dashboard Tổng Quan</span>
+            <span id="tabDashboardTitle">Dashboard Nhóm Trưởng</span>
         </button>
         <button class="tf-tab-btn" data-tab="tasks">
             <span>📋</span>
@@ -72,108 +109,279 @@
         </button>
     </nav>
 
-    <!-- TAB 1: DASHBOARD TỔNG QUAN -->
+    <!-- TAB 1: DASHBOARDS (2 DISTINCT DASHBOARDS) -->
     <div class="tf-tab-pane" id="pane-dashboard">
-        <!-- 4 KPI Summary Cards -->
-        <div class="row g-3 mb-4">
-            <div class="col-sm-6 col-xl-3">
-                <div class="tf-card p-3 h-100">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <div class="text-muted small fw-semibold text-uppercase">Tiến độ chung đồ án</div>
-                            <h2 class="fw-bold text-slate-900 mt-2 mb-1" id="dash-kpi-progress">0%</h2>
-                            <span class="small text-muted" id="dash-kpi-tasks">0 / 0 việc hoàn thành</span>
+        <!-- Role Indicator Banner -->
+        <div class="alert d-flex flex-wrap align-items-center justify-content-between p-3 mb-4 rounded-3 shadow-sm" id="roleBanner" style="background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%); border: 1px solid #bbf7d0;">
+            <div class="d-flex align-items-center gap-3">
+                <span class="fs-3" id="roleBannerIcon">👑</span>
+                <div>
+                    <h6 class="fw-bold text-slate-900 mb-0" id="roleBannerTitle">Bảng Điều Khiển Quản Trị - Nhóm Trưởng</h6>
+                    <div class="small text-slate-600 mt-1" id="roleBannerDesc">
+                        Bạn đang có quyền quản trị toàn diện: theo dõi chỉ số công bằng nhóm, giao việc, duyệt tiến độ và nhắc nhở thành viên.
+                    </div>
+                </div>
+            </div>
+            <div class="mt-2 mt-md-0 d-flex gap-2">
+                <button class="btn btn-sm btn-outline-primary fw-semibold" id="btnSwitchOtherRole" onclick="TeamFairApp.toggleCurrentRole()">
+                    🧑 Chuyển sang xem giao diện Thành Viên
+                </button>
+                <button class="btn btn-sm btn-light border fw-semibold" onclick="TeamFairApp.openLoginModal()">
+                    🔑 Đăng nhập tài khoản khác
+                </button>
+            </div>
+        </div>
+
+        <!-- ==================== DASHBOARD 1: LEADER VIEW ==================== -->
+        <div id="dash-leader-view">
+            <!-- 4 Leader KPI Cards -->
+            <div class="row g-3 mb-4">
+                <div class="col-sm-6 col-xl-3">
+                    <div class="tf-card p-3 h-100">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="text-muted small fw-semibold text-uppercase">Tiến độ chung đồ án</div>
+                                <h2 class="fw-bold text-slate-900 mt-2 mb-1" id="dash-kpi-progress">0%</h2>
+                                <span class="small text-muted" id="dash-kpi-tasks">0 / 0 việc hoàn thành</span>
+                            </div>
+                            <div class="p-2 rounded-3 bg-primary-subtle text-primary fs-4">📈</div>
                         </div>
-                        <div class="p-2 rounded-3 bg-primary-subtle text-primary fs-4">📈</div>
+                    </div>
+                </div>
+
+                <div class="col-sm-6 col-xl-3">
+                    <div class="tf-card p-3 h-100">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="text-muted small fw-semibold text-uppercase">Chỉ số công bằng nhóm</div>
+                                <h2 class="fw-bold text-success mt-2 mb-1" id="dash-kpi-fairness">--</h2>
+                                <span class="small text-muted" id="dash-kpi-fairness-label">Chờ thêm việc & thành viên</span>
+                            </div>
+                            <div class="p-2 rounded-3 bg-success-subtle text-success fs-4">⚖️</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-sm-6 col-xl-3">
+                    <div class="tf-card p-3 h-100">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="text-muted small fw-semibold text-uppercase">Cuộc họp nhóm kế tiếp</div>
+                                <h2 class="fw-bold text-slate-900 mt-2 mb-1" id="dash-kpi-meeting" style="font-size: 1.25rem;">Chưa có</h2>
+                                <button class="btn btn-link p-0 text-primary small text-decoration-none fw-semibold" onclick="TeamFairApp.switchTab('meeting')">
+                                    ➔ Đặt lịch phòng họp
+                                </button>
+                            </div>
+                            <div class="p-2 rounded-3 bg-warning-subtle text-warning fs-4">📹</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-sm-6 col-xl-3">
+                    <div class="tf-card p-3 h-100">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="text-muted small fw-semibold text-uppercase">Cảnh báo hạn chót</div>
+                                <h2 class="fw-bold text-danger mt-2 mb-1" id="leader-urgent-count">0 việc</h2>
+                                <button class="btn btn-link p-0 text-danger small text-decoration-none fw-semibold" onclick="TeamFairApp.sendAllPendingReminders()">
+                                    ✉️ Nhắc nhở hạn chót tất cả
+                                </button>
+                            </div>
+                            <div class="p-2 rounded-3 bg-danger-subtle text-danger fs-4">🔔</div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="col-sm-6 col-xl-3">
-                <div class="tf-card p-3 h-100">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <div class="text-muted small fw-semibold text-uppercase">Chỉ số công bằng</div>
-                            <h2 class="fw-bold text-success mt-2 mb-1" id="dash-kpi-fairness">--</h2>
-                            <span class="small text-muted" id="dash-kpi-fairness-label">Chờ thêm việc & thành viên</span>
+            <!-- Realtime Contribution Section (Step 3) -->
+            <div class="row g-4 mb-4">
+                <div class="col-lg-8">
+                    <div class="tf-card h-100">
+                        <div class="tf-card-header d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                <span class="tf-step-num">3</span>
+                                <div>
+                                    <h5 class="fw-bold text-slate-900 mb-0">Mức đóng góp theo thời gian thực (Toàn Nhóm)</h5>
+                                    <div class="text-muted small">(khối lượng × độ khó × chất lượng chéo)</div>
+                                </div>
+                            </div>
+                            <span class="badge bg-success-subtle text-success">Giám sát bởi Nhóm Trưởng</span>
                         </div>
-                        <div class="p-2 rounded-3 bg-success-subtle text-success fs-4">⚖️</div>
+                        <div class="tf-card-body" id="dash-chart-container">
+                            <!-- Rendered by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="tf-card h-100">
+                        <div class="tf-card-header">
+                            <h6 class="fw-bold text-slate-900 mb-0">🕒 Dòng sự kiện toàn nhóm</h6>
+                        </div>
+                        <div class="tf-card-body p-3" id="dash-activity-feed" style="max-height: 380px; overflow-y: auto;">
+                            <!-- Rendered by JS -->
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="col-sm-6 col-xl-3">
-                <div class="tf-card p-3 h-100">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <div class="text-muted small fw-semibold text-uppercase">Cuộc họp nhóm kế tiếp</div>
-                            <h2 class="fw-bold text-slate-900 mt-2 mb-1" id="dash-kpi-meeting" style="font-size: 1.25rem;">Chưa có</h2>
-                            <button class="btn btn-link p-0 text-primary small text-decoration-none fw-semibold" onclick="TeamFairApp.switchTab('meeting')">
-                                ➔ Đặt lịch phòng họp
+            <!-- Approval Queue & Urgent Deadlines -->
+            <div class="row g-4 mb-4">
+                <div class="col-lg-6">
+                    <div class="tf-card h-100">
+                        <div class="tf-card-header d-flex justify-content-between align-items-center">
+                            <h6 class="fw-bold text-slate-900 mb-0">✅ Hàng đợi duyệt & nghiệm thu công việc</h6>
+                            <span class="badge bg-warning text-dark" id="leader-review-badge">0 việc</span>
+                        </div>
+                        <div class="tf-card-body p-0" id="leader-approval-queue">
+                            <!-- Rendered by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="tf-card h-100">
+                        <div class="tf-card-header d-flex justify-content-between align-items-center">
+                            <h6 class="fw-bold text-slate-900 mb-0">⏰ Tiến độ & Nhắc nhở thành viên trễ hạn</h6>
+                            <button class="btn btn-sm btn-outline-danger" onclick="TeamFairApp.sendAllPendingReminders()">
+                                ✉️ Gửi email tất cả
                             </button>
                         </div>
-                        <div class="p-2 rounded-3 bg-warning-subtle text-warning fs-4">📹</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-sm-6 col-xl-3">
-                <div class="tf-card p-3 h-100">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <div class="text-muted small fw-semibold text-uppercase">Nhắc nhở qua email</div>
-                            <h2 class="fw-bold text-primary mt-2 mb-1">Tự Động</h2>
-                            <button class="btn btn-link p-0 text-danger small text-decoration-none fw-semibold" onclick="TeamFairApp.sendAllPendingReminders()">
-                                ✉️ Gửi email nhắc nhở ngay
-                            </button>
+                        <div class="tf-card-body p-0" id="dash-urgent-deadlines">
+                            <!-- Rendered by JS -->
                         </div>
-                        <div class="p-2 rounded-3 bg-danger-subtle text-danger fs-4">🔔</div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Realtime Contribution Section (User's Step 3) -->
-        <div class="row g-4 mb-4">
-            <div class="col-lg-8">
-                <div class="tf-card h-100">
-                    <div class="tf-card-header d-flex justify-content-between align-items-center">
-                        <div class="d-flex align-items-center">
-                            <span class="tf-step-num">3</span>
+        <!-- ==================== DASHBOARD 2: MEMBER VIEW ==================== -->
+        <div id="dash-member-view" class="d-none">
+            <!-- 4 Member KPI Cards -->
+            <div class="row g-3 mb-4">
+                <div class="col-sm-6 col-xl-3">
+                    <div class="tf-card p-3 h-100">
+                        <div class="d-flex justify-content-between align-items-start">
                             <div>
-                                <h5 class="fw-bold text-slate-900 mb-0">Mức đóng góp theo thời gian thực</h5>
-                                <div class="text-muted small">(khối lượng × độ khó × chất lượng)</div>
+                                <div class="text-muted small fw-semibold text-uppercase">Nhiệm vụ của tôi</div>
+                                <h2 class="fw-bold text-slate-900 mt-2 mb-1" id="member-kpi-tasks">0 việc</h2>
+                                <span class="small text-muted" id="member-kpi-task-status">0 việc hoàn thành</span>
+                            </div>
+                            <div class="p-2 rounded-3 bg-primary-subtle text-primary fs-4">📋</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-sm-6 col-xl-3">
+                    <div class="tf-card p-3 h-100">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="text-muted small fw-semibold text-uppercase">Đóng góp của tôi</div>
+                                <h2 class="fw-bold text-success mt-2 mb-1" id="member-kpi-contribution">0.0%</h2>
+                                <span class="small text-muted" id="member-kpi-points">0.0 điểm tích lũy</span>
+                            </div>
+                            <div class="p-2 rounded-3 bg-success-subtle text-success fs-4">🎯</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-sm-6 col-xl-3">
+                    <div class="tf-card p-3 h-100">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="text-muted small fw-semibold text-uppercase">Điểm đánh giá chéo</div>
+                                <h2 class="fw-bold text-warning mt-2 mb-1" id="member-kpi-rating">-- ⭐</h2>
+                                <span class="small text-muted" id="member-kpi-quality-mult">Hệ số chất lượng: 1.0x</span>
+                            </div>
+                            <div class="p-2 rounded-3 bg-warning-subtle text-warning fs-4">⭐</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-sm-6 col-xl-3">
+                    <div class="tf-card p-3 h-100">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="text-muted small fw-semibold text-uppercase">Lịch họp kế tiếp</div>
+                                <h2 class="fw-bold text-slate-900 mt-2 mb-1" id="member-kpi-meeting" style="font-size: 1.25rem;">Chưa có</h2>
+                                <button class="btn btn-link p-0 text-primary small text-decoration-none fw-semibold" onclick="TeamFairApp.enterVirtualMeeting('')">
+                                    📹 Vào phòng họp ngay
+                                </button>
+                            </div>
+                            <div class="p-2 rounded-3 bg-info-subtle text-info fs-4">🤝</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Member Workspace Row 1 -->
+            <div class="row g-4 mb-4">
+                <!-- My Assigned Tasks List -->
+                <div class="col-lg-8">
+                    <div class="tf-card h-100">
+                        <div class="tf-card-header d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="fw-bold text-slate-900 mb-0">📌 Công việc được giao cho tôi</h5>
+                                <div class="text-muted small">Cập nhật tiến độ hoàn thành và gửi nghiệm thu</div>
+                            </div>
+                            <button class="btn btn-sm btn-primary" onclick="TeamFairApp.switchTab('tasks')">
+                                ➔ Xem toàn bộ việc nhóm
+                            </button>
+                        </div>
+                        <div class="tf-card-body p-3" id="member-my-tasks-list">
+                            <!-- Rendered by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Peer Review Requests for Member -->
+                <div class="col-lg-4">
+                    <div class="tf-card h-100">
+                        <div class="tf-card-header d-flex justify-content-between align-items-center">
+                            <h6 class="fw-bold text-slate-900 mb-0">⭐ Đồng đội chờ bạn đánh giá chéo</h6>
+                            <span class="badge bg-primary rounded-pill" id="member-pending-review-count">0</span>
+                        </div>
+                        <div class="tf-card-body p-3" id="member-pending-reviews-list">
+                            <!-- Rendered by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Member Workspace Row 2: Availability & Personal Notifications -->
+            <div class="row g-4 mb-4">
+                <div class="col-lg-6">
+                    <div class="tf-card h-100">
+                        <div class="tf-card-header d-flex justify-content-between align-items-center">
+                            <h6 class="fw-bold text-slate-900 mb-0">🗓️ Cập nhật lịch rảnh cá nhân trong tuần</h6>
+                            <button class="btn btn-sm btn-outline-primary" onclick="TeamFairApp.switchTab('schedule')">
+                                Mở ma trận chi tiết
+                            </button>
+                        </div>
+                        <div class="tf-card-body p-3">
+                            <div class="alert alert-light border small text-muted mb-3">
+                                💡 Nhấp vào các buổi bạn có thể tham gia họp nhóm để hệ thống tự ghép giờ rảnh chung.
+                            </div>
+                            <div id="member-quick-schedule-container">
+                                <!-- Rendered by JS -->
                             </div>
                         </div>
                     </div>
-                    <div class="tf-card-body" id="dash-chart-container">
-                        <!-- Rendered by JS -->
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="tf-card h-100">
+                        <div class="tf-card-header d-flex justify-content-between align-items-center">
+                            <h6 class="fw-bold text-slate-900 mb-0">✉️ Thông báo & Nhắc nhở gửi riêng cho bạn</h6>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="TeamFairApp.switchTab('emails')">
+                                Mở hòm thư
+                            </button>
+                        </div>
+                        <div class="tf-card-body p-3" id="member-personal-emails-list" style="max-height: 320px; overflow-y: auto;">
+                            <!-- Rendered by JS -->
+                        </div>
                     </div>
                 </div>
-            </div>
-
-            <div class="col-lg-4">
-                <div class="tf-card h-100">
-                    <div class="tf-card-header">
-                        <h6 class="fw-bold text-slate-900 mb-0">🕒 Dòng sự kiện gần đây</h6>
-                    </div>
-                    <div class="tf-card-body p-3" id="dash-activity-feed" style="max-height: 380px; overflow-y: auto;">
-                        <!-- Rendered by JS -->
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Deadlines & Quick Email Reminders -->
-        <div class="tf-card mb-4">
-            <div class="tf-card-header d-flex justify-content-between align-items-center">
-                <h6 class="fw-bold text-slate-900 mb-0">⏰ Các công việc cần theo dõi tiến độ & nhắc nhở</h6>
-                <button class="btn btn-sm btn-outline-danger" onclick="TeamFairApp.sendAllPendingReminders()">
-                    ✉️ Nhắc nhở hạn chót tất cả
-                </button>
-            </div>
-            <div class="tf-card-body p-0" id="dash-urgent-deadlines">
-                <!-- Rendered by JS -->
             </div>
         </div>
     </div>
@@ -185,11 +393,12 @@
             <div class="col-lg-5">
                 <!-- Step 1: Thành viên nhóm -->
                 <div class="tf-card mb-4">
-                    <div class="tf-card-header">
+                    <div class="tf-card-header d-flex justify-content-between align-items-center">
                         <div class="d-flex align-items-center">
                             <span class="tf-step-num">1</span>
                             <h5 class="fw-bold text-slate-900 mb-0">Thành viên nhóm</h5>
                         </div>
+                        <span class="badge bg-light text-slate-600 border" id="memberRoleAccessNote">Quyền quản trị</span>
                     </div>
                     <div class="tf-card-body">
                         <form id="formAddMember" class="mb-3">
@@ -197,12 +406,23 @@
                                 <input type="text" id="memberName" class="form-control" placeholder="Tên thành viên..." required />
                                 <button type="submit" class="btn btn-primary px-3 fw-semibold">Thêm</button>
                             </div>
-                            <div class="row g-2">
+                            <div class="row g-2 mb-2">
                                 <div class="col-sm-7">
                                     <input type="email" id="memberEmail" class="form-control form-control-sm" placeholder="Email nhận thông báo..." />
                                 </div>
                                 <div class="col-sm-5">
                                     <input type="text" id="memberRole" class="form-control form-control-sm" placeholder="Vai trò (VD: Frontend)" />
+                                </div>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-sm-6">
+                                    <select id="memberRoleTypeSelect" class="form-select form-select-sm">
+                                        <option value="Member" selected>Vai trò: Thành viên</option>
+                                        <option value="Leader">Vai trò: Nhóm Trưởng (Leader)</option>
+                                    </select>
+                                </div>
+                                <div class="col-sm-6">
+                                    <input type="password" id="memberPasswordInput" class="form-control form-control-sm" placeholder="Mật khẩu (mặc định: 123456)" />
                                 </div>
                             </div>
                         </form>
@@ -237,10 +457,10 @@
                                 <div class="col-md-6">
                                     <label class="form-label small fw-semibold text-slate-700">Độ khó: *</label>
                                     <select id="taskDifficulty" class="form-select">
-                                        <option value="easy">Dễ</option>
-                                        <option value="medium" selected>Trung bình</option>
-                                        <option value="hard">Khó</option>
-                                        <option value="vhard">Rất khó</option>
+                                        <option value="easy">Dễ (1.0x)</option>
+                                        <option value="medium" selected>Trung bình (1.5x)</option>
+                                        <option value="hard">Khó (2.0x)</option>
+                                        <option value="vhard">Rất khó (3.0x)</option>
                                     </select>
                                 </div>
                             </div>
@@ -531,7 +751,7 @@
                 </div>
                 <div class="col-4">
                     <div class="fw-bold small text-muted text-uppercase mb-4">Trưởng Nhóm</div>
-                    <div class="fst-italic text-muted small">(Xác nhận điện tử)</div>
+                    <div class="fst-italic text-muted small" id="repLeaderSignature">Trưởng nhóm (Đã xác nhận điện tử ✓)</div>
                 </div>
                 <div class="col-4">
                     <div class="fw-bold small text-muted text-uppercase mb-4">Ngày Xuất Báo Cáo</div>
@@ -546,6 +766,98 @@
     <footer class="text-center text-muted small py-4 mt-3">
         TeamFair — Prototype cho buổi demo trước lớp
     </footer>
+</div>
+
+<!-- ==================== MODAL: ĐĂNG NHẬP / CHUYỂN VAI TRÒ ==================== -->
+<div class="modal fade" id="loginModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header border-0 pb-0">
+                <div>
+                    <h5 class="modal-title fw-bold text-slate-900">🔐 Đăng Nhập & Phân Quyền Vai Trò</h5>
+                    <div class="text-muted small">Chọn vai trò truy cập để hiển thị Dashboard tương ứng</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <!-- Nav Tabs for Login Modal -->
+                <ul class="nav nav-pills nav-fill mb-3" role="tablist">
+                    <li class="nav-item">
+                        <button class="nav-link active fw-semibold small" data-bs-toggle="pill" data-bs-target="#pillQuickSwitch" type="button">
+                            ⚡ Chuyển Đổi Nhanh (Demo)
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link fw-semibold small" data-bs-toggle="pill" data-bs-target="#pillEmailLogin" type="button">
+                            🔑 Email & Mật Khẩu
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+                    <!-- Tab 1: Quick Switch -->
+                    <div class="tab-pane fade show active" id="pillQuickSwitch">
+                        <div class="d-flex flex-column gap-3">
+                            <!-- Leader Option Card -->
+                            <div class="role-card-select" onclick="TeamFairApp.selectRoleCard('Leader')" id="roleCardLeader">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="fs-1">👑</div>
+                                        <div>
+                                            <div class="fw-bold text-slate-900">Nhóm Trưởng (Leader)</div>
+                                            <div class="text-muted small">Toàn quyền quản trị nhóm: xem điểm công bằng, phân chia việc, duyệt bài & nhắc nhở.</div>
+                                        </div>
+                                    </div>
+                                    <span class="badge bg-success" style="font-size: 0.8rem;">Đề xuất</span>
+                                </div>
+                            </div>
+
+                            <!-- Member Option Card -->
+                            <div class="role-card-select" onclick="TeamFairApp.selectRoleCard('Member')" id="roleCardMember">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="fs-1">🧑</div>
+                                        <div>
+                                            <div class="fw-bold text-slate-900">Thành Viên Nhóm (Member)</div>
+                                            <div class="text-muted small">Tập trung làm việc cá nhân: cập nhật tiến độ việc của tôi, chấm điểm đánh giá chéo.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-2" id="memberSelectDropdownContainer">
+                                    <label class="form-label small fw-semibold text-slate-700">Chọn thành viên đại diện:</label>
+                                    <select id="loginMemberSelect" class="form-select form-select-sm">
+                                        <!-- Rendered by JS -->
+                                    </select>
+                                </div>
+                            </div>
+
+                            <button type="button" class="btn btn-tf-primary text-white w-100 fw-bold py-2 mt-2" onclick="TeamFairApp.confirmQuickRole()">
+                                🚀 Vào Ngay Với Vai Trò Đã Chọn
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tab 2: Email & Password -->
+                    <div class="tab-pane fade" id="pillEmailLogin">
+                        <form id="formEmailLogin" onsubmit="event.preventDefault(); TeamFairApp.handleEmailLogin();">
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold text-slate-700">Email hoặc Tên thành viên:</label>
+                                <input type="text" id="loginEmailInput" class="form-control" placeholder="VD: an.nguyen@student.edu.vn hoặc Nguyễn Văn An" required />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold text-slate-700">Mật khẩu:</label>
+                                <input type="password" id="loginPasswordInput" class="form-control" value="123456" placeholder="Mật khẩu (mặc định 123456)" required />
+                                <div class="form-text small">Mật khẩu mặc định là <code>123456</code>.</div>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100 fw-bold py-2">
+                                🔑 Đăng Nhập
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- MODAL: PHÒNG HỌP ẢO (VIRTUAL MEETING ROOM) -->
