@@ -153,16 +153,16 @@ const TeamFairApp = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(this.state)
     })
-    .then(r => r.json())
-    .then(data => {
-      if (data && data.success) {
-        this.updateDbStatus(true);
-      }
-    })
-    .catch(err => {
-      console.warn("Lỗi sync Azure SQL:", err);
-      this.updateDbStatus(false);
-    });
+      .then(r => r.json())
+      .then(data => {
+        if (data && data.success) {
+          this.updateDbStatus(true);
+        }
+      })
+      .catch(err => {
+        console.warn("Lỗi sync Azure SQL:", err);
+        this.updateDbStatus(false);
+      });
   },
 
   updateDbStatus(isConnected) {
@@ -1122,8 +1122,8 @@ const TeamFairApp = {
     const container = document.getElementById("member-personal-emails-list");
     if (!container) return;
 
-    const personalEmails = this.state.emails.filter(e => 
-      e.to.toLowerCase() === (myEmail || "").toLowerCase() || 
+    const personalEmails = this.state.emails.filter(e =>
+      e.to.toLowerCase() === (myEmail || "").toLowerCase() ||
       e.to.toLowerCase().includes("all")
     );
 
