@@ -214,6 +214,12 @@ body {
   box-shadow: 0 4px 12px rgba(5, 150, 105, 0.35);
   transform: translateY(-1px);
 }
+.btn-tf-primary.active,
+.btn-tf-primary:active {
+  background: linear-gradient(135deg, #065f46 0%, #047857 100%);
+  color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.35), inset 0 2px 4px rgba(0, 0, 0, 0.15);
+}
 
 .btn-tf-indigo {
   background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);

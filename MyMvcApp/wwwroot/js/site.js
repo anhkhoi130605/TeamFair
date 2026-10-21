@@ -580,6 +580,11 @@ const TeamFairApp = {
       pane.classList.toggle("d-none", pane.id !== `pane-${tabId}`);
     });
 
+    const btnHeaderReport = document.getElementById("btnHeaderReport");
+    if (btnHeaderReport) {
+      btnHeaderReport.classList.toggle("active", tabId === "report");
+    }
+
     this.renderAll();
     window.scrollTo({ top: 0, behavior: "smooth" });
   },
@@ -706,6 +711,7 @@ const TeamFairApp = {
       document.getElementById("mainAppWorkspaceView")?.classList.add("d-none");
       document.getElementById("btnHeaderLogin")?.classList.remove("d-none");
       document.getElementById("btnHeaderDirectLogout")?.classList.add("d-none");
+      document.getElementById("btnHeaderReport")?.classList.add("d-none");
       document.getElementById("userAccountDropdown")?.classList.add("d-none");
       const topName = document.getElementById("topTeamName");
       if (topName) topName.textContent = "Chưa đăng nhập";
@@ -717,6 +723,7 @@ const TeamFairApp = {
     document.getElementById("mainAppWorkspaceView")?.classList.remove("d-none");
     document.getElementById("btnHeaderLogin")?.classList.add("d-none");
     document.getElementById("btnHeaderDirectLogout")?.classList.remove("d-none");
+    document.getElementById("btnHeaderReport")?.classList.remove("d-none");
     document.getElementById("userAccountDropdown")?.classList.remove("d-none");
 
     this.renderHeaderAndUser();
