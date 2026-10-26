@@ -269,3 +269,75 @@ public class ActivityLog
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
+
+
+public class ScheduleEvent
+{
+    [Key]
+    [MaxLength(50)]
+    public string Id { get; set; } = Guid.NewGuid().ToString("N")[..8];
+
+    [Required]
+    [MaxLength(250)]
+    public string Name { get; set; } = string.Empty;
+
+    public string DatesJson { get; set; } = "[]";
+
+    public int StartHour { get; set; } = 8; // 8 AM
+
+    public int EndHour { get; set; } = 22; // 10 PM
+
+    public int SlotMinutes { get; set; } = 30;
+
+    [MaxLength(100)]
+    public string TimeZone { get; set; } = "Asia/Ho_Chi_Minh";
+
+    [MaxLength(200)]
+    public string? CreatedByEmail { get; set; }
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public List<EventParticipant> Participants { get; set; } = new();
+}
+
+public class EventParticipant
+{
+    [Key]
+    [MaxLength(50)]
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+
+    [Required]
+    [MaxLength(50)]
+    public string EventId { get; set; } = string.Empty;
+
+    [Required]
+    [MaxLength(150)]
+    public string Name { get; set; } = string.Empty;
+
+    [MaxLength(250)]
+    public string? PasswordHash { get; set; }
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public List<EventAvailability> Availabilities { get; set; } = new();
+}
+
+public class EventAvailability
+{
+    [Key]
+    public int Id { get; set; }
+
+    [Required]
+    [MaxLength(50)]
+    public string EventId { get; set; } = string.Empty;
+
+    [Required]
+    [MaxLength(50)]
+    public string ParticipantId { get; set; } = string.Empty;
+
+    [Required]
+    [MaxLength(100)]
+    public string SlotKey { get; set; } = string.Empty;
+
+    public bool IsAvailable { get; set; } = true;
+}

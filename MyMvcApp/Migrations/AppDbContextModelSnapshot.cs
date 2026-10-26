@@ -140,6 +140,79 @@ namespace MyMvcApp.Migrations
                     b.ToTable("EmailLogs", (string)null);
                 });
 
+            modelBuilder.Entity("MyMvcApp.Models.EventAvailability", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("EventId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("EventParticipantId")
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("IsAvailable")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("ParticipantId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("SlotKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventParticipantId");
+
+                    b.HasIndex("EventId", "ParticipantId", "SlotKey");
+
+                    b.ToTable("EventAvailabilities", (string)null);
+                });
+
+            modelBuilder.Entity("MyMvcApp.Models.EventParticipant", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EventId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("PasswordHash")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<string>("ScheduleEventId")
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ScheduleEventId");
+
+                    b.HasIndex("EventId", "Name");
+
+                    b.ToTable("EventParticipants", (string)null);
+                });
+
             modelBuilder.Entity("MyMvcApp.Models.PeerReview", b =>
                 {
                     b.Property<string>("Id")
@@ -186,6 +259,47 @@ namespace MyMvcApp.Migrations
                     b.HasIndex("TaskId");
 
                     b.ToTable("PeerReviews", (string)null);
+                });
+
+            modelBuilder.Entity("MyMvcApp.Models.ScheduleEvent", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedByEmail")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("DatesJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("EndHour")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<int>("SlotMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<int>("StartHour")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TimeZone")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ScheduleEvents", (string)null);
                 });
 
             modelBuilder.Entity("MyMvcApp.Models.ScheduleSlot", b =>
@@ -451,6 +565,20 @@ namespace MyMvcApp.Migrations
                     b.ToTable("TeamTasks", (string)null);
                 });
 
+            modelBuilder.Entity("MyMvcApp.Models.EventAvailability", b =>
+                {
+                    b.HasOne("MyMvcApp.Models.EventParticipant", null)
+                        .WithMany("Availabilities")
+                        .HasForeignKey("EventParticipantId");
+                });
+
+            modelBuilder.Entity("MyMvcApp.Models.EventParticipant", b =>
+                {
+                    b.HasOne("MyMvcApp.Models.ScheduleEvent", null)
+                        .WithMany("Participants")
+                        .HasForeignKey("ScheduleEventId");
+                });
+
             modelBuilder.Entity("MyMvcApp.Models.ScheduleSlot", b =>
                 {
                     b.HasOne("MyMvcApp.Models.TeamMember", null)
@@ -477,6 +605,16 @@ namespace MyMvcApp.Migrations
                     b.HasOne("MyMvcApp.Models.Team", null)
                         .WithMany("Tasks")
                         .HasForeignKey("TeamId");
+                });
+
+            modelBuilder.Entity("MyMvcApp.Models.EventParticipant", b =>
+                {
+                    b.Navigation("Availabilities");
+                });
+
+            modelBuilder.Entity("MyMvcApp.Models.ScheduleEvent", b =>
+                {
+                    b.Navigation("Participants");
                 });
 
             modelBuilder.Entity("MyMvcApp.Models.Team", b =>

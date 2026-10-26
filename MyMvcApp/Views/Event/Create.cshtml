@@ -1,0 +1,487 @@
+@{
+    ViewData["Title"] = "Tạo Sự Kiện Lịch Rảnh (When2meet Scheduler) - TeamFair";
+    Layout = "_Layout";
+}
+
+<div class="container py-4 py-md-5" style="max-width: 860px;">
+    <!-- Breadcrumb & Back to Teamfair -->
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <a href="/" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+            ← Quay lại TeamFair
+        </a>
+        <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill">
+            When2meet Scheduler
+        </span>
+    </div>
+
+    <!-- Main Card -->
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+        <div class="card-header bg-white border-bottom p-4">
+            <h3 class="fw-bold text-slate-900 mb-1">Tạo Khảo Sát Lịch Rảnh Mới</h3>
+            <p class="text-muted mb-0 small">
+                Tạo một bảng khảo sát thời gian để cả nhóm cùng tô lịch rảnh. Hệ thống tự động tổng hợp để tìm ra khung giờ vàng phù hợp nhất cho tất cả mọi người.
+            </p>
+        </div>
+
+        <div class="card-body p-4">
+            <form id="createEventForm" onsubmit="handleCreateEvent(event)">
+                <!-- 1. Event Name -->
+                <div class="mb-4">
+                    <label for="eventName" class="form-label fw-bold text-slate-800">
+                        1. Tên sự kiện hoặc cuộc họp <span class="text-danger">*</span>
+                    </label>
+                    <input type="text" id="eventName" class="form-control form-control-lg rounded-3" 
+                           placeholder="Ví dụ: Họp nhóm Đồ án môn học, Thảo luận Sprint 2..." required maxlength="200" />
+                    <div class="form-text">Tên rõ ràng giúp các thành viên dễ nhận diện khi mở link.</div>
+                </div>
+
+                <!-- 2. Date Selection -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold text-slate-800 d-flex justify-content-between align-items-center">
+                        <span>2. Chọn các ngày khảo sát <span class="text-danger">*</span></span>
+                        <span id="selectedDatesCountBadge" class="badge bg-success-subtle text-success border border-success-subtle rounded-pill">
+                            Đã chọn 0 ngày
+                        </span>
+                    </label>
+
+                    <!-- Date Selection Type Tabs -->
+                    <ul class="nav nav-pills mb-3" id="dateTab" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active rounded-pill px-3 py-2 fw-semibold" id="tab-specific-dates" 
+                                    data-bs-toggle="pill" data-bs-target="#content-specific-dates" type="button" role="tab">
+                                📅 Ngày cụ thể trên lịch
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link rounded-pill px-3 py-2 fw-semibold" id="tab-days-of-week" 
+                                    data-bs-toggle="pill" data-bs-target="#content-days-of-week" type="button" role="tab">
+                                🔄 Thứ trong tuần (Lịch định kỳ)
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="dateTabContent">
+                        <!-- TAB A: SPECIFIC DATES -->
+                        <div class="tab-pane fade show active p-3 border rounded-3 bg-light" id="content-specific-dates" role="tabpanel">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                                <div class="d-flex align-items-center gap-2">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="changeMonth(-1)">‹ Tháng trước</button>
+                                    <span id="currentMonthYearLabel" class="fw-bold text-slate-800 mx-2">Tháng 10 / 2026</span>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="changeMonth(1)">Tháng sau ›</button>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectNext7Days()">7 ngày tới</button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearSelectedDates()">Xóa chọn</button>
+                                </div>
+                            </div>
+
+                            <!-- Calendar Grid Container -->
+                            <div id="calendarContainer" class="bg-white p-3 rounded-3 border">
+                                <!-- Calendar dynamically rendered by JS -->
+                            </div>
+
+                            <div class="mt-3 text-muted small">
+                                💡 <em>Nhấp chuột vào các ô ngày để chọn hoặc bỏ chọn. Có thể chọn nhiều ngày không liền kề.</em>
+                            </div>
+                        </div>
+
+                        <!-- TAB B: DAYS OF WEEK -->
+                        <div class="tab-pane fade p-3 border rounded-3 bg-light" id="content-days-of-week" role="tabpanel">
+                            <div class="text-muted small mb-3">
+                                Chọn các thứ trong tuần mà bạn muốn khảo sát lịch rảnh:
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 mb-3" id="weekdaysContainer">
+                                <button type="button" class="btn btn-outline-secondary rounded-pill px-3 weekday-chip" data-day="Mon">Thứ 2 (Mon)</button>
+                                <button type="button" class="btn btn-outline-secondary rounded-pill px-3 weekday-chip" data-day="Tue">Thứ 3 (Tue)</button>
+                                <button type="button" class="btn btn-outline-secondary rounded-pill px-3 weekday-chip" data-day="Wed">Thứ 4 (Wed)</button>
+                                <button type="button" class="btn btn-outline-secondary rounded-pill px-3 weekday-chip" data-day="Thu">Thứ 5 (Thu)</button>
+                                <button type="button" class="btn btn-outline-secondary rounded-pill px-3 weekday-chip" data-day="Fri">Thứ 6 (Fri)</button>
+                                <button type="button" class="btn btn-outline-secondary rounded-pill px-3 weekday-chip" data-day="Sat">Thứ 7 (Sat)</button>
+                                <button type="button" class="btn btn-outline-secondary rounded-pill px-3 weekday-chip" data-day="Sun">Chủ Nhật (Sun)</button>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectWorkdays()">Thứ 2 - Thứ 6</button>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllWeekdays()">Cả tuần</button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearWeekdays()">Bỏ chọn</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Time Window (Start - End) -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label for="startHourSelect" class="form-label fw-bold text-slate-800">
+                            3. Không sớm hơn (Bắt đầu)
+                        </label>
+                        <select id="startHourSelect" class="form-select rounded-3">
+                            <!-- Populated by JS -->
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="endHourSelect" class="form-label fw-bold text-slate-800">
+                            Không muộn hơn (Kết thúc)
+                        </label>
+                        <select id="endHourSelect" class="form-select rounded-3">
+                            <!-- Populated by JS -->
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 4. TimeZone & Slot Interval -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label for="timezoneSelect" class="form-label fw-bold text-slate-800">
+                            4. Múi giờ mặc định
+                        </label>
+                        <select id="timezoneSelect" class="form-select rounded-3">
+                            <option value="Asia/Ho_Chi_Minh" selected>Asia/Ho_Chi_Minh (GMT+7:00 Hà Nội, Băng Cốc)</option>
+                            <option value="Asia/Tokyo">Asia/Tokyo (GMT+9:00 Tokyo, Seoul)</option>
+                            <option value="Asia/Singapore">Asia/Singapore (GMT+8:00 Singapore, Bắc Kinh)</option>
+                            <option value="Europe/London">Europe/London (GMT+0:00 London)</option>
+                            <option value="Europe/Paris">Europe/Paris (GMT+1:00 Paris, Berlin)</option>
+                            <option value="America/New_York">America/New_York (GMT-5:00 New York)</option>
+                            <option value="America/Los_Angeles">America/Los_Angeles (GMT-8:00 San Francisco)</option>
+                            <option value="UTC">UTC (Giờ phối hợp quốc tế)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="slotMinutesSelect" class="form-label fw-bold text-slate-800">
+                            Độ dài mỗi ô thời gian
+                        </label>
+                        <select id="slotMinutesSelect" class="form-select rounded-3">
+                            <option value="30" selected>30 phút (Chuẩn When2meet, tối ưu cho khảo sát)</option>
+                            <option value="15">15 phút (Chi tiết hơn)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="pt-3 border-top">
+                    <button type="submit" id="btnSubmitCreate" class="btn btn-primary btn-lg rounded-pill px-5 shadow-sm w-100 w-md-auto fw-bold">
+                        🚀 Tạo Sự Kiện & Lấy Link Chia Sẻ
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- SUCCESS MODAL -->
+<div class="modal fade" id="modalEventCreated" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold text-slate-900">🎉 Tạo Sự Kiện Thành Công!</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-muted">
+                    Sự kiện của bạn đã sẵn sàng. Hãy gửi link dưới đây cho các thành viên trong nhóm để mọi người vào tô lịch rảnh:
+                </p>
+                <div class="input-group mb-3">
+                    <input type="text" id="createdEventUrlInput" class="form-control rounded-start-3 font-monospace bg-light" readonly />
+                    <button class="btn btn-primary px-3 rounded-end-3" type="button" onclick="copyCreatedLink()">
+                        📋 Sao chép
+                    </button>
+                </div>
+                <div id="copySuccessAlert" class="alert alert-success py-2 px-3 small d-none">
+                    ✓ Đã sao chép liên kết vào bộ nhớ tạm!
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <a href="#" id="btnGoToEvent" class="btn btn-success rounded-pill px-4 fw-bold w-100">
+                    Đi tới trang điền lịch ngay →
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    let selectedDates = new Set();
+    let currentCalendarDate = new Date();
+    let activeDateTab = 'specific'; // 'specific' or 'weekdays'
+
+    document.addEventListener('DOMContentLoaded', () => {
+        populateHours();
+        renderCalendar();
+        setupWeekdays();
+        selectNext7Days(); // Mặc định chọn 7 ngày tới
+
+        // Tab switches
+        document.getElementById('tab-specific-dates').addEventListener('shown.bs.tab', () => {
+            activeDateTab = 'specific';
+            updateSelectedBadge();
+        });
+        document.getElementById('tab-days-of-week').addEventListener('shown.bs.tab', () => {
+            activeDateTab = 'weekdays';
+            updateSelectedBadge();
+        });
+    });
+
+    function populateHours() {
+        const startSelect = document.getElementById('startHourSelect');
+        const endSelect = document.getElementById('endHourSelect');
+        startSelect.innerHTML = '';
+        endSelect.innerHTML = '';
+
+        for (let h = 0; h <= 24; h++) {
+            let label = formatHourLabel(h);
+            if (h < 24) {
+                const opt1 = new Option(label, h);
+                if (h === 8) opt1.selected = true; // 8:00 AM
+                startSelect.add(opt1);
+            }
+            if (h > 0) {
+                const opt2 = new Option(label, h);
+                if (h === 22) opt2.selected = true; // 10:00 PM (22:00)
+                endSelect.add(opt2);
+            }
+        }
+
+        startSelect.addEventListener('change', () => {
+            const startVal = parseInt(startSelect.value);
+            const endVal = parseInt(endSelect.value);
+            if (endVal <= startVal) {
+                endSelect.value = Math.min(24, startVal + 4);
+            }
+        });
+    }
+
+    function formatHourLabel(h) {
+        if (h === 0 || h === 24) return (h === 0 ? '12:00 AM (Nửa đêm)' : '12:00 AM (Đêm kết thúc)');
+        if (h === 12) return '12:00 PM (Trưa)';
+        if (h < 12) return `${h}:00 AM`;
+        return `${h - 12}:00 PM (${h}:00)`;
+    }
+
+    // ---------------- CALENDAR ----------------
+    function renderCalendar() {
+        const container = document.getElementById('calendarContainer');
+        const year = currentCalendarDate.getFullYear();
+        const month = currentCalendarDate.getMonth();
+
+        document.getElementById('currentMonthYearLabel').textContent = `Tháng ${month + 1} / ${year}`;
+
+        const firstDayOfMonth = new Date(year, month, 1);
+        const lastDayOfMonth = new Date(year, month + 1, 0);
+        let startDay = firstDayOfMonth.getDay(); // 0 is Sun, 1 is Mon...
+        // Let's adjust so Monday is first day of week:
+        let colStart = (startDay + 6) % 7; 
+
+        let html = `
+            <table class="table table-bordered text-center mb-0 calendar-table">
+                <thead>
+                    <tr class="table-light small">
+                        <th>T2</th><th>T3</th><th>T4</th><th>T5</th><th>T6</th><th class="text-primary">T7</th><th class="text-danger">CN</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+        `;
+
+        for (let i = 0; i < colStart; i++) {
+            html += `<td class="bg-light text-muted"></td>`;
+        }
+
+        const todayStr = toDateString(new Date());
+
+        for (let day = 1; day <= lastDayOfMonth.getDate(); day++) {
+            const curDate = new Date(year, month, day);
+            const dateStr = toDateString(curDate);
+            const isSelected = selectedDates.has(dateStr);
+            const isToday = dateStr === todayStr;
+
+            let cellClass = 'cal-day-cell cursor-pointer p-2 position-relative';
+            if (isSelected) cellClass += ' bg-success text-white fw-bold';
+            else if (isToday) cellClass += ' bg-primary-subtle fw-semibold';
+
+            html += `
+                <td class="${cellClass}" onclick="toggleDate('${dateStr}')" style="cursor: pointer; user-select: none;">
+                    ${day}
+                    ${isSelected ? '<span class="position-absolute top-0 end-0 p-1 text-white small" style="font-size:10px;">✓</span>' : ''}
+                </td>
+            `;
+
+            if ((colStart + day) % 7 === 0 && day !== lastDayOfMonth.getDate()) {
+                html += `</tr><tr>`;
+            }
+        }
+
+        const remaining = 7 - ((colStart + lastDayOfMonth.getDate()) % 7);
+        if (remaining < 7) {
+            for (let i = 0; i < remaining; i++) {
+                html += `<td class="bg-light text-muted"></td>`;
+            }
+        }
+
+        html += `</tr></tbody></table>`;
+        container.innerHTML = html;
+        updateSelectedBadge();
+    }
+
+    function changeMonth(delta) {
+        currentCalendarDate.setMonth(currentCalendarDate.getMonth() + delta);
+        renderCalendar();
+    }
+
+    function toggleDate(dateStr) {
+        if (selectedDates.has(dateStr)) {
+            selectedDates.delete(dateStr);
+        } else {
+            selectedDates.add(dateStr);
+        }
+        renderCalendar();
+    }
+
+    function selectNext7Days() {
+        selectedDates.clear();
+        const start = new Date();
+        for (let i = 0; i < 7; i++) {
+            const d = new Date();
+            d.setDate(start.getDate() + i);
+            selectedDates.add(toDateString(d));
+        }
+        renderCalendar();
+    }
+
+    function clearSelectedDates() {
+        selectedDates.clear();
+        renderCalendar();
+    }
+
+    function toDateString(d) {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    // ---------------- WEEKDAYS ----------------
+    function setupWeekdays() {
+        document.querySelectorAll('.weekday-chip').forEach(btn => {
+            btn.addEventListener('click', () => {
+                btn.classList.toggle('active');
+                btn.classList.toggle('btn-success');
+                btn.classList.toggle('btn-outline-secondary');
+                updateSelectedBadge();
+            });
+        });
+    }
+
+    function selectWorkdays() {
+        document.querySelectorAll('.weekday-chip').forEach(btn => {
+            const day = btn.getAttribute('data-day');
+            if (['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].includes(day)) {
+                btn.classList.add('active', 'btn-success');
+                btn.classList.remove('btn-outline-secondary');
+            } else {
+                btn.classList.remove('active', 'btn-success');
+                btn.classList.add('btn-outline-secondary');
+            }
+        });
+        updateSelectedBadge();
+    }
+
+    function selectAllWeekdays() {
+        document.querySelectorAll('.weekday-chip').forEach(btn => {
+            btn.classList.add('active', 'btn-success');
+            btn.classList.remove('btn-outline-secondary');
+        });
+        updateSelectedBadge();
+    }
+
+    function clearWeekdays() {
+        document.querySelectorAll('.weekday-chip').forEach(btn => {
+            btn.classList.remove('active', 'btn-success');
+            btn.classList.add('btn-outline-secondary');
+        });
+        updateSelectedBadge();
+    }
+
+    function updateSelectedBadge() {
+        const badge = document.getElementById('selectedDatesCountBadge');
+        if (activeDateTab === 'specific') {
+            badge.textContent = `Đã chọn ${selectedDates.size} ngày`;
+        } else {
+            const count = document.querySelectorAll('.weekday-chip.active').length;
+            badge.textContent = `Đã chọn ${count} thứ trong tuần`;
+        }
+    }
+
+    // ---------------- FORM SUBMIT ----------------
+    async function handleCreateEvent(e) {
+        e.preventDefault();
+        const name = document.getElementById('eventName').value.trim();
+        const startHour = parseInt(document.getElementById('startHourSelect').value);
+        const endHour = parseInt(document.getElementById('endHourSelect').value);
+        const timezone = document.getElementById('timezoneSelect').value;
+        const slotMinutes = parseInt(document.getElementById('slotMinutesSelect').value);
+
+        let dates = [];
+        if (activeDateTab === 'specific') {
+            dates = Array.from(selectedDates).sort();
+        } else {
+            const activeChips = document.querySelectorAll('.weekday-chip.active');
+            activeChips.forEach(btn => dates.push(btn.getAttribute('data-day')));
+        }
+
+        if (dates.length === 0) {
+            alert('Vui lòng chọn ít nhất một ngày hoặc một thứ trong tuần!');
+            return;
+        }
+
+        if (endHour <= startHour) {
+            alert('Giờ kết thúc phải lớn hơn giờ bắt đầu!');
+            return;
+        }
+
+        const btnSubmit = document.getElementById('btnSubmitCreate');
+        btnSubmit.disabled = true;
+        btnSubmit.innerHTML = '⏳ Đang tạo sự kiện...';
+
+        try {
+            const res = await fetch('/api/events/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: name,
+                    dates: dates,
+                    startHour: startHour,
+                    endHour: endHour,
+                    slotMinutes: slotMinutes,
+                    timeZone: timezone
+                })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById('createdEventUrlInput').value = data.fullUrl || (window.location.origin + data.url);
+                document.getElementById('btnGoToEvent').href = data.url;
+
+                const modal = new bootstrap.Modal(document.getElementById('modalEventCreated'));
+                modal.show();
+            } else {
+                alert(data.message || 'Không thể tạo sự kiện.');
+            }
+        } catch (err) {
+            console.error('Error creating event:', err);
+            alert('Có lỗi xảy ra khi kết nối máy chủ.');
+        } finally {
+            btnSubmit.disabled = false;
+            btnSubmit.innerHTML = '🚀 Tạo Sự Kiện & Lấy Link Chia Sẻ';
+        }
+    }
+
+    function copyCreatedLink() {
+        const input = document.getElementById('createdEventUrlInput');
+        navigator.clipboard.writeText(input.value).then(() => {
+            const alertBox = document.getElementById('copySuccessAlert');
+            alertBox.classList.remove('d-none');
+            setTimeout(() => alertBox.classList.add('d-none'), 3000);
+        });
+    }
+</script>
+}

@@ -1,0 +1,1030 @@
+@model MyMvcApp.Models.ScheduleEvent
+@{
+    ViewData["Title"] = Model.Name + " - Lịch Rảnh When2meet - TeamFair";
+    Layout = "_Layout";
+}
+
+<div class="container-fluid px-3 px-md-5 py-3">
+    <!-- TOP HEADER -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 pb-3 mb-3 border-bottom">
+        <div>
+            <div class="d-flex align-items-center gap-2">
+                <a href="/event" class="btn btn-sm btn-outline-secondary rounded-pill px-3">
+                    + Tạo sự kiện mới
+                </a>
+                <a href="/" class="btn btn-sm btn-light text-muted rounded-pill px-2">
+                    TeamFair
+                </a>
+            </div>
+            <h2 class="fw-bold text-slate-900 mt-2 mb-0" id="eventTitle">@Model.Name</h2>
+            <div class="text-muted small" id="eventSubtitle">
+                Đang tải thông tin thời gian...
+            </div>
+        </div>
+
+        <!-- SHARE LINK & TIMEZONE -->
+        <div class="d-flex flex-wrap align-items-center gap-3">
+            <!-- Share link box -->
+            <div class="bg-light p-2 rounded-3 border d-flex align-items-center gap-2">
+                <span class="small text-muted fw-semibold ps-1">Link mời:</span>
+                <input type="text" id="shareUrlInput" class="form-control form-control-sm bg-white font-monospace" style="width: 220px;" readonly />
+                <button type="button" class="btn btn-sm btn-primary px-3 rounded-2 fw-semibold" onclick="copyShareUrl()">
+                    📋 Sao chép
+                </button>
+            </div>
+
+            <!-- Timezone selector -->
+            <div class="d-flex align-items-center gap-2">
+                <label for="userTimezoneSelect" class="small fw-bold text-slate-700 text-nowrap">Múi giờ của bạn:</label>
+                <select id="userTimezoneSelect" class="form-select form-select-sm rounded-2" style="min-width: 210px;" onchange="handleTimezoneChange()">
+                    <option value="Asia/Ho_Chi_Minh">Asia/Ho_Chi_Minh (GMT+7 Hà Nội)</option>
+                    <option value="Asia/Tokyo">Asia/Tokyo (GMT+9 Tokyo)</option>
+                    <option value="Asia/Singapore">Asia/Singapore (GMT+8 Singapore)</option>
+                    <option value="Europe/London">Europe/London (GMT+0 London)</option>
+                    <option value="Europe/Paris">Europe/Paris (GMT+1 Paris)</option>
+                    <option value="America/New_York">America/New_York (GMT-5 New York)</option>
+                    <option value="America/Los_Angeles">America/Los_Angeles (GMT-8 San Francisco)</option>
+                    <option value="UTC">UTC (Giờ quốc tế)</option>
+                </select>
+            </div>
+
+            <!-- User Sign In / Profile status -->
+            <div id="userAuthBadge" class="bg-white p-2 rounded-3 border d-flex align-items-center gap-2">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- INSTRUCTIONS BANNER -->
+    <div class="alert alert-light border shadow-sm py-2 px-3 mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div class="small text-slate-700">
+            👉 <strong>Hướng dẫn:</strong> Nhập tên của bạn, sau đó <strong>nhấn và kéo chuột</strong> trên bảng bên trái để tô các khung giờ bạn rảnh. Bảng bên phải sẽ tự động hiển thị số người rảnh ở từng giờ.
+        </div>
+        <div id="saveStatusIndicator" class="small text-muted fst-italic">
+            ✓ Đã lưu tự động
+        </div>
+    </div>
+
+    <!-- MAIN TWO-COLUMN SCHEDULER VIEW -->
+    <div class="row g-4" id="schedulerWorkspace">
+        <!-- LEFT COLUMN: PERSONAL AVAILABILITY -->
+        <div class="col-lg-6">
+            <div class="card border rounded-3 shadow-sm h-100">
+                <div class="card-header bg-white p-3 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <div>
+                        <h5 class="fw-bold text-slate-900 mb-0" id="personalGridTitle">
+                            Lịch rảnh của bạn
+                        </h5>
+                        <div class="text-muted small">
+                            Nhấn và kéo để chọn/bỏ chọn – Tự động lưu
+                        </div>
+                    </div>
+
+                    <!-- Personal Legend -->
+                    <div class="d-flex align-items-center gap-3 small">
+                        <div class="d-flex align-items-center gap-1">
+                            <span class="legend-color-box legend-pink"></span>
+                            <span class="text-slate-600">Không rảnh</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-1">
+                            <span class="legend-color-box legend-green"></span>
+                            <span class="text-slate-900 fw-semibold">Rảnh</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body p-3 overflow-auto" id="personalGridWrapper">
+                    <div id="personalGridScrollContainer" class="w2m-table-container">
+                        <!-- Personal Grid Table rendered by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: GROUP AVAILABILITY -->
+        <div class="col-lg-6">
+            <div class="card border rounded-3 shadow-sm h-100">
+                <div class="card-header bg-white p-3 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <div>
+                        <h5 class="fw-bold text-slate-900 mb-0">
+                            Lịch rảnh của cả nhóm
+                        </h5>
+                        <div class="text-muted small">
+                            Rê chuột lên lịch để xem ai rảnh
+                        </div>
+                    </div>
+
+                    <!-- Group Heatmap Gradient Legend -->
+                    <div class="d-flex align-items-center gap-2 small">
+                        <span id="legendMinLabel" class="text-muted">0/0 rảnh</span>
+                        <div class="heatmap-gradient-bar"></div>
+                        <span id="legendMaxLabel" class="text-success fw-bold">0/0 rảnh</span>
+                    </div>
+                </div>
+
+                <div class="card-body p-3">
+                    <div class="row g-3">
+                        <!-- Group Grid Table -->
+                        <div class="col-md-7 col-xl-8 overflow-auto">
+                            <div id="groupGridScrollContainer" class="w2m-table-container">
+                                <!-- Group Grid Table rendered by JS -->
+                            </div>
+                        </div>
+
+                        <!-- Hover Inspector Info Box -->
+                        <div class="col-md-5 col-xl-4">
+                            <div class="p-3 bg-light rounded-3 border sticky-top" style="top: 15px;" id="hoverDetailsBox">
+                                <h6 class="fw-bold text-slate-800 border-bottom pb-2 mb-2">Chi tiết khung giờ</h6>
+                                <div id="hoverTimeLabel" class="fw-bold text-primary mb-2 small">
+                                    <em>Rê chuột vào một ô trên bảng nhóm để xem</em>
+                                </div>
+                                <div id="hoverFreeCountBadge" class="badge bg-success-subtle text-success border border-success-subtle mb-3 d-none">
+                                    0 người rảnh
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="small fw-bold text-success mb-1">
+                                        ✓ Rảnh (<span id="hoverAvailableCount">0</span>):
+                                    </div>
+                                    <ul id="hoverAvailableList" class="list-unstyled small ps-1 mb-0 text-slate-700">
+                                        <li class="text-muted fst-italic">Chưa có ai</li>
+                                    </ul>
+                                </div>
+
+                                <div>
+                                    <div class="small fw-bold text-danger mb-1">
+                                        ✕ Không rảnh (<span id="hoverUnavailableCount">0</span>):
+                                    </div>
+                                    <ul id="hoverUnavailableList" class="list-unstyled small ps-1 mb-0 text-slate-500">
+                                        <li class="text-muted fst-italic">--</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SIGN IN / PARTICIPANT MODAL -->
+<div class="modal fade" id="modalSignIn" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 440px;">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold text-slate-900">👋 Đăng Nhập Điền Lịch Rảnh</h5>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-muted small">
+                    Nhập tên của bạn để bắt đầu tô lịch. Không cần tạo tài khoản! Nếu quay lại sau bằng cùng tên, lịch rảnh đã lưu sẽ tự động được tải lại.
+                </p>
+                <form id="signInForm" onsubmit="handleSignInSubmit(event)">
+                    <div class="mb-3">
+                        <label for="inputParticipantName" class="form-label fw-bold text-slate-800">Tên của bạn <span class="text-danger">*</span></label>
+                        <input type="text" id="inputParticipantName" class="form-control rounded-3" placeholder="Ví dụ: Hoàng Anh, Linh..." required maxlength="100" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="inputParticipantPassword" class="form-label fw-semibold text-slate-700 d-flex justify-content-between">
+                            <span>Mật khẩu (Tùy chọn)</span>
+                            <span class="text-muted small fw-normal">Để bảo vệ lịch của bạn</span>
+                        </label>
+                        <input type="password" id="inputParticipantPassword" class="form-control rounded-3" placeholder="Nhập mật khẩu nếu có" />
+                    </div>
+                    <div id="signInErrorAlert" class="alert alert-danger py-2 px-3 small d-none"></div>
+
+                    <button type="submit" id="btnSignInSubmit" class="btn btn-primary rounded-pill w-100 fw-bold py-2 mt-2">
+                        Bắt Đầu Điền Lịch →
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* When2meet Classic & Polished Styles */
+    .w2m-table-container {
+        position: relative;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        background: #fff;
+    }
+
+    .w2m-table {
+        border-collapse: separate;
+        border-spacing: 0;
+        margin-bottom: 0;
+        user-select: none;
+    }
+
+    /* Column Header: 2 lines */
+    .w2m-col-header {
+        background: #f8fafc;
+        border-top: 2px solid #64748b;
+        border-bottom: 2px solid #64748b;
+        border-right: 1px solid #cbd5e1;
+        padding: 4px 2px;
+        text-align: center;
+        min-width: 60px;
+        max-width: 80px;
+        cursor: pointer;
+        transition: background 0.15s ease;
+    }
+    .w2m-col-header:hover {
+        background: #e2e8f0;
+    }
+    .w2m-col-header .date-small {
+        font-size: 11px;
+        color: #64748b;
+        line-height: 1.2;
+    }
+    .w2m-col-header .day-large {
+        font-size: 13px;
+        font-weight: 700;
+        color: #0f172a;
+        line-height: 1.2;
+    }
+
+    /* Time Labels Column */
+    .w2m-time-col {
+        width: 65px;
+        min-width: 65px;
+        text-align: right;
+        padding-right: 8px;
+        font-size: 11px;
+        color: #475569;
+        font-weight: 600;
+        vertical-align: top;
+        border-right: 2px solid #64748b;
+        user-select: none;
+        white-space: nowrap;
+    }
+
+    /* Grid Cells */
+    .w2m-cell {
+        height: 14px;
+        min-height: 14px;
+        min-width: 60px;
+        max-width: 80px;
+        padding: 0;
+        border-right: 1px solid #cbd5e1;
+        border-top: 1px dotted #e2e8f0;
+        cursor: pointer;
+        transition: filter 0.05s ease;
+    }
+
+    /* Outer border and whole hour solid divider */
+    .w2m-hour-top {
+        border-top: 1px solid #64748b !important;
+    }
+
+    .w2m-table tbody tr:last-child .w2m-cell {
+        border-bottom: 2px solid #64748b;
+    }
+    .w2m-table thead tr th:first-child,
+    .w2m-table tbody tr td:first-child {
+        border-left: 2px solid #64748b;
+    }
+
+    /* Personal Cell States */
+    .cell-unavailable {
+        background-color: #FFDEDE; /* Pink */
+    }
+    .cell-available {
+        background-color: #339900 !important; /* Green */
+    }
+    .cell-preview-add {
+        background-color: #8ce65a !important; /* Preview Paint */
+    }
+    .cell-preview-remove {
+        background-color: #ff9999 !important; /* Preview Erase */
+    }
+
+    /* Group Cell Styles */
+    .group-cell {
+        cursor: crosshair;
+    }
+    .group-cell:hover {
+        outline: 2px solid #0f172a;
+        z-index: 5;
+        position: relative;
+    }
+    .golden-hour-cell {
+        box-shadow: inset 0 0 0 2px #15803d;
+    }
+
+    /* Legends */
+    .legend-color-box {
+        display: inline-block;
+        width: 18px;
+        height: 18px;
+        border-radius: 3px;
+        border: 1px solid #94a3b8;
+    }
+    .legend-pink {
+        background-color: #FFDEDE;
+    }
+    .legend-green {
+        background-color: #339900;
+    }
+
+    .heatmap-gradient-bar {
+        width: 90px;
+        height: 14px;
+        border-radius: 3px;
+        border: 1px solid #94a3b8;
+        background: linear-gradient(to right, #ffffff, #dcfce7, #4ade80, #15803d);
+    }
+</style>
+
+@section Scripts {
+<script>
+    const EVENT_CODE = "@Model.Id";
+    let eventData = null;
+    let currentParticipant = null; // { id, name }
+    let mySlots = new Set(); // Set of slotKey strings
+    let currentTimezone = "Asia/Ho_Chi_Minh";
+
+    // Drag selection state
+    let isMouseDown = false;
+    let dragMode = 'paint'; // 'paint' or 'erase'
+    let dragStart = null; // { dayIdx, slotIdx }
+    let dragEnd = null;   // { dayIdx, slotIdx }
+    let saveTimeout = null;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        // Init share link
+        const shareInput = document.getElementById('shareUrlInput');
+        shareInput.value = window.location.href;
+
+        // Init timezone dropdown from user's local timezone if detected
+        try {
+            const detectedTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            if (detectedTz) {
+                const tzSelect = document.getElementById('userTimezoneSelect');
+                let exists = false;
+                for (let i = 0; i < tzSelect.options.length; i++) {
+                    if (tzSelect.options[i].value === detectedTz) {
+                        tzSelect.selectedIndex = i;
+                        exists = true;
+                        break;
+                    }
+                }
+                if (!exists) {
+                    tzSelect.add(new Option(detectedTz, detectedTz, true, true));
+                }
+                currentTimezone = detectedTz;
+            }
+        } catch (e) {
+            console.warn('Could not detect timezone, using Asia/Ho_Chi_Minh');
+        }
+
+        // Global mouse up to finish drag
+        document.addEventListener('mouseup', () => {
+            if (isMouseDown) {
+                commitDrag();
+            }
+        });
+
+        // Load event data
+        await loadEventData();
+
+        // Check localStorage for saved participant
+        const savedAuth = localStorage.getItem('w2m_auth_' + EVENT_CODE);
+        if (savedAuth) {
+            try {
+                const parsed = JSON.parse(savedAuth);
+                if (parsed.name) {
+                    await attemptAutoSignIn(parsed.name, parsed.password || '');
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        if (!currentParticipant) {
+            // Prompt sign in
+            const modal = new bootstrap.Modal(document.getElementById('modalSignIn'));
+            modal.show();
+        }
+
+        // Setup real-time polling every 4 seconds
+        setInterval(async () => {
+            if (!isMouseDown) {
+                await loadEventData(true);
+            }
+        }, 4000);
+    });
+
+    // ---------------- LOAD EVENT DATA ----------------
+    async function loadEventData(isBackgroundPoll = false) {
+        try {
+            const res = await fetch(`/api/events/${EVENT_CODE}`);
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.success) {
+                eventData = data;
+                if (!isBackgroundPoll) {
+                    updateHeaderInfo();
+                }
+                renderGrids();
+            }
+        } catch (err) {
+            console.error('Error loading event data:', err);
+        }
+    }
+
+    function updateHeaderInfo() {
+        if (!eventData) return;
+        document.getElementById('eventTitle').textContent = eventData.name;
+        const totalDates = eventData.dates.length;
+        const totalParticipants = eventData.participants.length;
+
+        document.getElementById('eventSubtitle').textContent = 
+            `Khảo sát: ${totalDates} ngày • Khung giờ: ${formatHour(eventData.startHour)} – ${formatHour(eventData.endHour)} • ${totalParticipants} người đã tham gia`;
+        
+        document.getElementById('legendMinLabel').textContent = `0/${totalParticipants} rảnh`;
+        document.getElementById('legendMaxLabel').textContent = `${totalParticipants}/${totalParticipants} rảnh`;
+    }
+
+    // ---------------- AUTHENTICATION ----------------
+    async function handleSignInSubmit(e) {
+        e.preventDefault();
+        const nameInput = document.getElementById('inputParticipantName');
+        const passInput = document.getElementById('inputParticipantPassword');
+        const errAlert = document.getElementById('signInErrorAlert');
+        errAlert.classList.add('d-none');
+
+        const name = nameInput.value.trim();
+        const password = passInput.value;
+
+        if (!name) return;
+
+        const btn = document.getElementById('btnSignInSubmit');
+        btn.disabled = true;
+        btn.innerHTML = 'Đang xử lý...';
+
+        try {
+            const res = await fetch(`/api/events/${EVENT_CODE}/signin`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name, password: password })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                currentParticipant = data.participant;
+                mySlots = new Set(data.slots || []);
+                localStorage.setItem('w2m_auth_' + EVENT_CODE, JSON.stringify({ name: name, password: password }));
+
+                const modalEl = document.getElementById('modalSignIn');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+
+                updateAuthBadge();
+                renderGrids();
+            } else {
+                errAlert.textContent = data.message || 'Không thể đăng nhập.';
+                errAlert.classList.remove('d-none');
+            }
+        } catch (err) {
+            errAlert.textContent = 'Lỗi kết nối máy chủ.';
+            errAlert.classList.remove('d-none');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = 'Bắt Đầu Điền Lịch →';
+        }
+    }
+
+    async function attemptAutoSignIn(name, password) {
+        try {
+            const res = await fetch(`/api/events/${EVENT_CODE}/signin`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name, password: password })
+            });
+            const data = await res.json();
+            if (data.success) {
+                currentParticipant = data.participant;
+                mySlots = new Set(data.slots || []);
+                updateAuthBadge();
+            }
+        } catch (err) {
+            console.error('Auto sign-in failed:', err);
+        }
+    }
+
+    function updateAuthBadge() {
+        const badge = document.getElementById('userAuthBadge');
+        if (currentParticipant) {
+            document.getElementById('personalGridTitle').textContent = `Lịch rảnh của ${currentParticipant.name}`;
+            badge.innerHTML = `
+                <div class="small text-slate-800">
+                    Bạn: <strong class="text-primary">${escapeHtml(currentParticipant.name)}</strong>
+                </div>
+                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 small" onclick="switchUser()">
+                    Đổi người
+                </button>
+            `;
+        } else {
+            document.getElementById('personalGridTitle').textContent = `Lịch rảnh của bạn`;
+            badge.innerHTML = `
+                <button type="button" class="btn btn-primary btn-sm px-3" onclick="openSignInModal()">
+                    Đăng nhập để điền
+                </button>
+            `;
+        }
+    }
+
+    function switchUser() {
+        currentParticipant = null;
+        mySlots.clear();
+        localStorage.removeItem('w2m_auth_' + EVENT_CODE);
+        updateAuthBadge();
+        renderGrids();
+        openSignInModal();
+    }
+
+    function openSignInModal() {
+        const modal = new bootstrap.Modal(document.getElementById('modalSignIn'));
+        modal.show();
+    }
+
+    // ---------------- TIMEZONE & DATES ----------------
+    function handleTimezoneChange() {
+        currentTimezone = document.getElementById('userTimezoneSelect').value;
+        renderGrids();
+    }
+
+    function formatHour(h) {
+        if (h === 0 || h === 24) return '12 AM';
+        if (h === 12) return '12 PM';
+        if (h < 12) return `${h} AM`;
+        return `${h - 12} PM`;
+    }
+
+    function getSlotDurationMinutes() {
+        return eventData?.slotMinutes || 30;
+    }
+
+    // Calculate slots per day
+    function getSlotsPerDay() {
+        if (!eventData) return [];
+        const interval = getSlotDurationMinutes();
+        const startTotalMins = eventData.startHour * 60;
+        const endTotalMins = eventData.endHour * 60;
+        const slots = [];
+
+        for (let m = startTotalMins; m < endTotalMins; m += interval) {
+            const hour = Math.floor(m / 60);
+            const minute = m % 60;
+            const isHourTop = (minute === 0);
+            slots.push({
+                minuteOffset: m,
+                hour: hour,
+                minute: minute,
+                isHourTop: isHourTop,
+                label: isHourTop ? formatHour(hour) : ''
+            });
+        }
+        return slots;
+    }
+
+    // Generate unique slot key
+    function getSlotKey(dateStr, slot) {
+        // Form: YYYY-MM-DD_HH:mm or Weekday_HH:mm
+        const hh = String(slot.hour).padStart(2, '0');
+        const mm = String(slot.minute).padStart(2, '0');
+        return `${dateStr}_${hh}:${mm}`;
+    }
+
+    function formatSlotTimeRange(slot) {
+        const interval = getSlotDurationMinutes();
+        const endMins = slot.minuteOffset + interval;
+        const endH = Math.floor(endMins / 60);
+        const endM = endMins % 60;
+
+        const sStr = `${String(slot.hour).padStart(2, '0')}:${String(slot.minute).padStart(2, '0')}`;
+        const eStr = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+        return `${sStr} – ${eStr}`;
+    }
+
+    function formatHeaderDate(dateStr) {
+        // If dateStr is a weekday like "Mon", "Tue"
+        const weekdayMap = {
+            'Mon': { day: 'Thứ 2', short: 'Mon' },
+            'Tue': { day: 'Thứ 3', short: 'Tue' },
+            'Wed': { day: 'Thứ 4', short: 'Wed' },
+            'Thu': { day: 'Thứ 5', short: 'Thu' },
+            'Fri': { day: 'Thứ 6', short: 'Fri' },
+            'Sat': { day: 'Thứ 7', short: 'Sat' },
+            'Sun': { day: 'Chủ Nhật', short: 'Sun' }
+        };
+
+        if (weekdayMap[dateStr]) {
+            return {
+                line1: weekdayMap[dateStr].short,
+                line2: weekdayMap[dateStr].day
+            };
+        }
+
+        // Specific date YYYY-MM-DD
+        const parts = dateStr.split('-');
+        if (parts.length === 3) {
+            const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+            const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+            const dayName = dayNames[d.getDay()];
+            return {
+                line1: `${parts[2]}/${parts[1]}`, // e.g. 27/10
+                line2: dayName
+            };
+        }
+
+        return { line1: dateStr, line2: '' };
+    }
+
+    // ---------------- GRID RENDERING ----------------
+    function renderGrids() {
+        if (!eventData) return;
+        renderPersonalGrid();
+        renderGroupGrid();
+    }
+
+    function renderPersonalGrid() {
+        const container = document.getElementById('personalGridScrollContainer');
+        const slots = getSlotsPerDay();
+        const dates = eventData.dates;
+
+        let html = `<table class="w2m-table" id="tablePersonal"><thead><tr>`;
+        html += `<th class="w2m-time-col"></th>`; // Time column
+
+        dates.forEach((d, dayIdx) => {
+            const h = formatHeaderDate(d);
+            html += `
+                <th class="w2m-col-header" onclick="toggleWholeDay(${dayIdx})" title="Nhấp để chọn/bỏ chọn cả ngày">
+                    <div class="date-small">${h.line1}</div>
+                    <div class="day-large">${h.line2}</div>
+                </th>
+            `;
+        });
+        html += `</tr></thead><tbody>`;
+
+        slots.forEach((slot, slotIdx) => {
+            html += `<tr>`;
+            html += `<td class="w2m-time-col">${slot.isHourTop ? slot.label : ''}</td>`;
+
+            dates.forEach((d, dayIdx) => {
+                const key = getSlotKey(d, slot);
+                const isSelected = mySlots.has(key);
+                let cellClass = 'w2m-cell' + (slot.isHourTop ? ' w2m-hour-top' : '');
+                cellClass += isSelected ? ' cell-available' : ' cell-unavailable';
+
+                html += `
+                    <td class="${cellClass}" 
+                        id="p_${dayIdx}_${slotIdx}"
+                        data-day="${dayIdx}" 
+                        data-slot="${slotIdx}"
+                        data-key="${key}"
+                        onmousedown="handleCellMouseDown(event, ${dayIdx}, ${slotIdx})"
+                        onmouseenter="handleCellMouseEnter(${dayIdx}, ${slotIdx})">
+                    </td>
+                `;
+            });
+            html += `</tr>`;
+        });
+
+        html += `</tbody></table>`;
+        container.innerHTML = html;
+
+        setupTouchEvents(container);
+    }
+
+    function renderGroupGrid() {
+        const container = document.getElementById('groupGridScrollContainer');
+        const slots = getSlotsPerDay();
+        const dates = eventData.dates;
+        const totalParticipants = eventData.participants.length;
+
+        // Count availabilities per slot key
+        const counts = {};
+        const whoIsAvailable = {};
+
+        eventData.availabilities.forEach(a => {
+            counts[a.slotKey] = (counts[a.slotKey] || 0) + 1;
+            if (!whoIsAvailable[a.slotKey]) whoIsAvailable[a.slotKey] = [];
+            whoIsAvailable[a.slotKey].push(a.participantId);
+        });
+
+        let html = `<table class="w2m-table" id="tableGroup"><thead><tr>`;
+        html += `<th class="w2m-time-col"></th>`;
+
+        dates.forEach((d, dayIdx) => {
+            const h = formatHeaderDate(d);
+            html += `
+                <th class="w2m-col-header">
+                    <div class="date-small">${h.line1}</div>
+                    <div class="day-large">${h.line2}</div>
+                </th>
+            `;
+        });
+        html += `</tr></thead><tbody>`;
+
+        slots.forEach((slot, slotIdx) => {
+            html += `<tr>`;
+            html += `<td class="w2m-time-col">${slot.isHourTop ? slot.label : ''}</td>`;
+
+            dates.forEach((d, dayIdx) => {
+                const key = getSlotKey(d, slot);
+                const freeCount = counts[key] || 0;
+                const ratio = totalParticipants > 0 ? (freeCount / totalParticipants) : 0;
+
+                let cellClass = 'w2m-cell group-cell' + (slot.isHourTop ? ' w2m-hour-top' : '');
+                let bgStyle = '#ffffff';
+
+                if (freeCount > 0 && totalParticipants > 0) {
+                    const alpha = 0.15 + (ratio * 0.85);
+                    bgStyle = `rgba(51, 153, 0, ${alpha.toFixed(2)})`;
+                }
+
+                if (totalParticipants > 0 && freeCount === totalParticipants) {
+                    cellClass += ' golden-hour-cell';
+                }
+
+                html += `
+                    <td class="${cellClass}" 
+                        style="background-color: ${bgStyle};"
+                        data-key="${key}"
+                        data-day="${dayIdx}"
+                        data-slot="${slotIdx}"
+                        onmouseenter="handleGroupHover('${key}', ${dayIdx}, ${slotIdx})"
+                        onclick="handleGroupHover('${key}', ${dayIdx}, ${slotIdx})">
+                    </td>
+                `;
+            });
+            html += `</tr>`;
+        });
+
+        html += `</tbody></table>`;
+        container.innerHTML = html;
+    }
+
+    // ---------------- DRAG SELECTION LOGIC ----------------
+    function handleCellMouseDown(e, dayIdx, slotIdx) {
+        if (!currentParticipant) {
+            openSignInModal();
+            return;
+        }
+        e.preventDefault();
+        isMouseDown = true;
+        dragStart = { dayIdx, slotIdx };
+        dragEnd = { dayIdx, slotIdx };
+
+        const target = e.currentTarget;
+        const key = target.getAttribute('data-key');
+        // If already selected, dragMode is 'erase', otherwise 'paint'
+        dragMode = mySlots.has(key) ? 'erase' : 'paint';
+
+        updateDragPreview();
+    }
+
+    function handleCellMouseEnter(dayIdx, slotIdx) {
+        if (!isMouseDown || !dragStart) return;
+        dragEnd = { dayIdx, slotIdx };
+        updateDragPreview();
+    }
+
+    function updateDragPreview() {
+        if (!dragStart || !dragEnd) return;
+
+        const minDay = Math.min(dragStart.dayIdx, dragEnd.dayIdx);
+        const maxDay = Math.max(dragStart.dayIdx, dragEnd.dayIdx);
+        const minSlot = Math.min(dragStart.slotIdx, dragEnd.slotIdx);
+        const maxSlot = Math.max(dragStart.slotIdx, dragEnd.slotIdx);
+
+        // Reset all preview classes
+        document.querySelectorAll('#tablePersonal .w2m-cell').forEach(cell => {
+            cell.classList.remove('cell-preview-add', 'cell-preview-remove');
+        });
+
+        for (let d = minDay; d <= maxDay; d++) {
+            for (let s = minSlot; s <= maxSlot; s++) {
+                const cell = document.getElementById(`p_${d}_${s}`);
+                if (cell) {
+                    if (dragMode === 'paint') {
+                        cell.classList.add('cell-preview-add');
+                    } else {
+                        cell.classList.add('cell-preview-remove');
+                    }
+                }
+            }
+        }
+    }
+
+    function commitDrag() {
+        isMouseDown = false;
+        if (!dragStart || !dragEnd) return;
+
+        const minDay = Math.min(dragStart.dayIdx, dragEnd.dayIdx);
+        const maxDay = Math.max(dragStart.dayIdx, dragEnd.dayIdx);
+        const minSlot = Math.min(dragStart.slotIdx, dragEnd.slotIdx);
+        const maxSlot = Math.max(dragStart.slotIdx, dragEnd.slotIdx);
+
+        const slots = getSlotsPerDay();
+        for (let d = minDay; d <= maxDay; d++) {
+            const dateStr = eventData.dates[d];
+            for (let s = minSlot; s <= maxSlot; s++) {
+                const slot = slots[s];
+                const key = getSlotKey(dateStr, slot);
+                if (dragMode === 'paint') {
+                    mySlots.add(key);
+                } else {
+                    mySlots.delete(key);
+                }
+            }
+        }
+
+        dragStart = null;
+        dragEnd = null;
+
+        renderPersonalGrid();
+        triggerAutoSave();
+    }
+
+    // Toggle entire day
+    function toggleWholeDay(dayIdx) {
+        if (!currentParticipant) {
+            openSignInModal();
+            return;
+        }
+
+        const dateStr = eventData.dates[dayIdx];
+        const slots = getSlotsPerDay();
+
+        // Check if all are currently selected
+        const allSelected = slots.every(s => mySlots.has(getSlotKey(dateStr, s)));
+
+        slots.forEach(s => {
+            const key = getSlotKey(dateStr, s);
+            if (allSelected) {
+                mySlots.delete(key);
+            } else {
+                mySlots.add(key);
+            }
+        });
+
+        renderPersonalGrid();
+        triggerAutoSave();
+    }
+
+    // Touch support for mobile dragging
+    function setupTouchEvents(container) {
+        container.addEventListener('touchstart', (e) => {
+            if (!currentParticipant) return;
+            const touch = e.touches[0];
+            const target = document.elementFromPoint(touch.clientX, touch.clientY);
+            if (target && target.classList.contains('w2m-cell')) {
+                e.preventDefault();
+                const dayIdx = parseInt(target.getAttribute('data-day'));
+                const slotIdx = parseInt(target.getAttribute('data-slot'));
+                isMouseDown = true;
+                dragStart = { dayIdx, slotIdx };
+                dragEnd = { dayIdx, slotIdx };
+                const key = target.getAttribute('data-key');
+                dragMode = mySlots.has(key) ? 'erase' : 'paint';
+                updateDragPreview();
+            }
+        }, { passive: false });
+
+        container.addEventListener('touchmove', (e) => {
+            if (!isMouseDown) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            const target = document.elementFromPoint(touch.clientX, touch.clientY);
+            if (target && target.classList.contains('w2m-cell')) {
+                const dayIdx = parseInt(target.getAttribute('data-day'));
+                const slotIdx = parseInt(target.getAttribute('data-slot'));
+                if (!dragEnd || dragEnd.dayIdx !== dayIdx || dragEnd.slotIdx !== slotIdx) {
+                    dragEnd = { dayIdx, slotIdx };
+                    updateDragPreview();
+                }
+            }
+        }, { passive: false });
+
+        container.addEventListener('touchend', () => {
+            if (isMouseDown) {
+                commitDrag();
+            }
+        });
+    }
+
+    // ---------------- AUTO-SAVE ----------------
+    function triggerAutoSave() {
+        if (!currentParticipant) return;
+
+        const statusEl = document.getElementById('saveStatusIndicator');
+        statusEl.textContent = '⏳ Đang lưu...';
+        statusEl.className = 'small text-warning fw-semibold';
+
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(async () => {
+            try {
+                const res = await fetch(`/api/events/${EVENT_CODE}/availability`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        participantId: currentParticipant.id,
+                        slotKeys: Array.from(mySlots)
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    const now = new Date();
+                    statusEl.textContent = `✓ Đã tự động lưu lúc ${now.toLocaleTimeString()}`;
+                    statusEl.className = 'small text-success';
+                    // Refresh group data immediately
+                    await loadEventData(true);
+                } else {
+                    statusEl.textContent = '⚠️ Lỗi khi lưu';
+                    statusEl.className = 'small text-danger';
+                }
+            } catch (err) {
+                console.error('Auto save error:', err);
+                statusEl.textContent = '⚠️ Lỗi kết nối';
+                statusEl.className = 'small text-danger';
+            }
+        }, 500);
+    }
+
+    // ---------------- GROUP HOVER INSPECTOR ----------------
+    function handleGroupHover(slotKey, dayIdx, slotIdx) {
+        if (!eventData) return;
+
+        const dateStr = eventData.dates[dayIdx];
+        const slots = getSlotsPerDay();
+        const slot = slots[slotIdx];
+        const h = formatHeaderDate(dateStr);
+        const timeRange = formatSlotTimeRange(slot);
+
+        // Format label: "Thứ 6, 17/3, 1:00–1:30 PM"
+        document.getElementById('hoverTimeLabel').textContent = `${h.line2} (${h.line1}), ${timeRange}`;
+
+        // Find who is available
+        const freeParticipants = [];
+        const busyParticipants = [];
+
+        eventData.participants.forEach(p => {
+            const isFree = eventData.availabilities.some(a => a.participantId === p.id && a.slotKey === slotKey);
+            if (isFree) {
+                freeParticipants.push(p.name);
+            } else {
+                busyParticipants.push(p.name);
+            }
+        });
+
+        const total = eventData.participants.length;
+        const freeCount = freeParticipants.length;
+
+        const countBadge = document.getElementById('hoverFreeCountBadge');
+        countBadge.textContent = `${freeCount}/${total} người rảnh (${total > 0 ? Math.round(freeCount / total * 100) : 0}%)`;
+        countBadge.classList.remove('d-none');
+
+        document.getElementById('hoverAvailableCount').textContent = freeCount;
+        document.getElementById('hoverUnavailableCount').textContent = busyParticipants.length;
+
+        const availList = document.getElementById('hoverAvailableList');
+        if (freeParticipants.length === 0) {
+            availList.innerHTML = '<li class="text-muted fst-italic">Không có ai rảnh</li>';
+        } else {
+            availList.innerHTML = freeParticipants.map(name => `
+                <li class="d-flex align-items-center gap-1 text-success fw-semibold">
+                    <span>✓</span> <span>${escapeHtml(name)}</span>
+                </li>
+            `).join('');
+        }
+
+        const unavailList = document.getElementById('hoverUnavailableList');
+        if (busyParticipants.length === 0) {
+            unavailList.innerHTML = '<li class="text-muted fst-italic">Không có ai bận</li>';
+        } else {
+            unavailList.innerHTML = busyParticipants.map(name => `
+                <li class="d-flex align-items-center gap-1 text-slate-500">
+                    <span>✕</span> <span>${escapeHtml(name)}</span>
+                </li>
+            `).join('');
+        }
+    }
+
+    function copyShareUrl() {
+        const input = document.getElementById('shareUrlInput');
+        navigator.clipboard.writeText(input.value).then(() => {
+            alert('✓ Đã sao chép link mời vào bộ nhớ tạm! Bạn có thể gửi cho các thành viên.');
+        });
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+</script>
+}

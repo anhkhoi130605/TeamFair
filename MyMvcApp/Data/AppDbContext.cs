@@ -18,6 +18,10 @@ public class AppDbContext : DbContext
     public DbSet<PeerReview> PeerReviews => Set<PeerReview>();
     public DbSet<EmailLog> EmailLogs => Set<EmailLog>();
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
+    public DbSet<ScheduleEvent> ScheduleEvents => Set<ScheduleEvent>();
+    public DbSet<EventParticipant> EventParticipants => Set<EventParticipant>();
+    public DbSet<EventAvailability> EventAvailabilities => Set<EventAvailability>();
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -81,5 +85,26 @@ public class AppDbContext : DbContext
             entity.ToTable("ActivityLogs");
             entity.HasKey(e => e.Id);
         });
+
+        modelBuilder.Entity<ScheduleEvent>(entity =>
+        {
+            entity.ToTable("ScheduleEvents");
+            entity.HasKey(e => e.Id);
+        });
+
+        modelBuilder.Entity<EventParticipant>(entity =>
+        {
+            entity.ToTable("EventParticipants");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.EventId, e.Name });
+        });
+
+        modelBuilder.Entity<EventAvailability>(entity =>
+        {
+            entity.ToTable("EventAvailabilities");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.EventId, e.ParticipantId, e.SlotKey });
+        });
+
     }
 }
