@@ -43,6 +43,10 @@ const TeamFairApp = {
   screenSharing: false,
   meetingTimer: null,
   meetingSeconds: 0,
+  selectedTaskStatus: "all",
+  selectedTaskMember: "all",
+  selectedEmailFilter: "all",
+  selectedReviewFilter: "pending",
 
   async init() {
     // Kiểm tra thông báo lỗi từ callback nếu có
@@ -63,6 +67,7 @@ const TeamFairApp = {
     await this.loadState();
     this.bindEvents();
     this.renderAll();
+    this.initTooltips();
 
     // Tự động kiểm tra nhắc hạn chót theo cấu hình khi vào trang
     setTimeout(() => {
@@ -238,11 +243,18 @@ const TeamFairApp = {
     const el = document.getElementById("dbStatusBadge");
     if (el) {
       if (isConnected) {
-        el.className = "badge bg-success-subtle text-success border border-success-subtle px-2 py-1";
-        el.innerHTML = "Azure SQL: Đã kết nối";
+        el.className = "d-inline-flex align-items-center";
+        el.setAttribute("title", "Azure SQL: Đã kết nối");
+        el.setAttribute("data-bs-toggle", "tooltip");
+        el.innerHTML = '<span class="tf-db-dot"></span>';
       } else {
-        el.className = "badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1";
-        el.innerHTML = "Azure SQL: Ngoại tuyến";
+        el.className = "d-inline-flex align-items-center";
+        el.setAttribute("title", "Azure SQL: Ngoại tuyến");
+        el.setAttribute("data-bs-toggle", "tooltip");
+        el.innerHTML = '<span class="tf-db-dot offline"></span>';
+      }
+      if (window.bootstrap && bootstrap.Tooltip) {
+        bootstrap.Tooltip.getOrCreateInstance(el);
       }
     }
   },
@@ -676,8 +688,18 @@ const TeamFairApp = {
     this.renderAll();
   },
 
+  initTooltips() {
+    if (window.bootstrap && bootstrap.Tooltip) {
+      document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+        try {
+          bootstrap.Tooltip.getOrCreateInstance(el);
+        } catch (e) { }
+      });
+    }
+  },
+
   bindEvents() {
-    document.querySelectorAll(".tf-tab-btn").forEach(btn => {
+    document.querySelectorAll(".tf-tab-btn, .tf-rail-btn, .tf-mobile-nav-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         const tab = btn.getAttribute("data-tab");
         if (tab) this.switchTab(tab);
@@ -725,7 +747,7 @@ const TeamFairApp = {
 
   switchTab(tabId) {
     this.activeTab = tabId;
-    document.querySelectorAll(".tf-tab-btn").forEach(btn => {
+    document.querySelectorAll(".tf-tab-btn, .tf-rail-btn, .tf-mobile-nav-btn").forEach(btn => {
       btn.classList.toggle("active", btn.getAttribute("data-tab") === tabId);
     });
 
@@ -733,12 +755,40 @@ const TeamFairApp = {
       pane.classList.toggle("d-none", pane.id !== `pane-${tabId}`);
     });
 
+    const TAB_TITLES = {
+      dashboard: this.currentUser?.roleType === "Leader" ? "Dashboard Nhóm Trưởng" : "Dashboard Thành Viên",
+      tasks: "Phân Chia Việc",
+      schedule: "Lịch Rảnh Nhóm",
+      meeting: "Phòng Họp Ảo",
+      reviews: "Đánh Giá Chéo",
+      emails: "Thông Báo & Mail",
+      report: "Báo Cáo Nộp Bài"
+    };
+
+    const breadcrumb = document.getElementById("pageBreadcrumb");
+    if (breadcrumb) {
+      breadcrumb.textContent = `TeamFair › ${TAB_TITLES[tabId] || 'Dashboard'}`;
+    }
+
+    const titleEl = document.getElementById("pageMainTitle");
+    if (titleEl) {
+      titleEl.textContent = TAB_TITLES[tabId] || 'Dashboard';
+    }
+
+    const backBtn = document.getElementById("headerBackBtn");
+    if (backBtn) {
+      backBtn.classList.toggle("d-none", tabId !== "report");
+    }
+
     const btnHeaderReport = document.getElementById("btnHeaderReport");
     if (btnHeaderReport) {
       btnHeaderReport.classList.toggle("active", tabId === "report");
     }
 
+    this.renderSubrail();
+    this.renderHeaderActionButtons();
     this.renderAll();
+    this.initTooltips();
     window.scrollTo({ top: 0, behavior: "smooth" });
   },
 
@@ -860,8 +910,11 @@ const TeamFairApp = {
 
   renderAll() {
     if (!this.currentUser) {
+      document.getElementById("authPortalWrapper")?.classList.remove("d-none");
       document.getElementById("authPortalView")?.classList.remove("d-none");
       document.getElementById("mainAppWorkspaceView")?.classList.add("d-none");
+      document.getElementById("iconRail")?.classList.add("d-none");
+      document.getElementById("secondaryCategoryRail")?.classList.add("d-none");
       document.getElementById("btnHeaderLogin")?.classList.remove("d-none");
       document.getElementById("btnHeaderDirectLogout")?.classList.add("d-none");
       document.getElementById("btnHeaderReport")?.classList.add("d-none");
@@ -872,14 +925,18 @@ const TeamFairApp = {
       return;
     }
 
+    document.getElementById("authPortalWrapper")?.classList.add("d-none");
     document.getElementById("authPortalView")?.classList.add("d-none");
     document.getElementById("mainAppWorkspaceView")?.classList.remove("d-none");
+    document.getElementById("iconRail")?.classList.remove("d-none");
     document.getElementById("btnHeaderLogin")?.classList.add("d-none");
     document.getElementById("btnHeaderDirectLogout")?.classList.remove("d-none");
     document.getElementById("btnHeaderReport")?.classList.remove("d-none");
     document.getElementById("userAccountDropdown")?.classList.remove("d-none");
 
     this.renderHeaderAndUser();
+    this.renderSubrail();
+    this.renderHeaderActionButtons();
 
     // Check if user has an active team
     const teamHubView = document.getElementById("teamHubView");
@@ -888,10 +945,10 @@ const TeamFairApp = {
     const memberView = document.getElementById("dash-member-view");
 
     const hasJoinedTeam = Boolean(
-      this.state && 
-      this.state.team && 
-      this.state.team.joinCode && 
-      Array.isArray(this.state.members) && 
+      this.state &&
+      this.state.team &&
+      this.state.team.joinCode &&
+      Array.isArray(this.state.members) &&
       this.state.members.length > 0
     );
 
@@ -949,7 +1006,7 @@ const TeamFairApp = {
       if (bannerJoinDisplay) bannerJoinDisplay.classList.add("d-none");
     }
 
-    // User profile in Header - Luôn hiển thị tên người dùng đã đăng ký/đăng nhập
+    // User profile in Header & Rail
     const isLeader = this.currentUser.roleType === "Leader";
     const elUserName = document.getElementById("userNameDisplay");
     if (elUserName) elUserName.textContent = this.currentUser.name || (isLeader ? "Trưởng Nhóm" : "Thành Viên");
@@ -962,7 +1019,7 @@ const TeamFairApp = {
 
     const elAvatar = document.getElementById("userAvatarBadge");
     if (elAvatar) {
-      elAvatar.style.backgroundColor = this.currentUser.color || (isLeader ? "#059669" : "#2563eb");
+      elAvatar.style.backgroundColor = this.currentUser.color || (isLeader ? "#7C5CFC" : "#3CC8C8");
       elAvatar.textContent = this.currentUser.avatar || (this.currentUser.name ? this.currentUser.name.trim().substring(0, 2).toUpperCase() : (isLeader ? "TN" : "TV"));
     }
 
@@ -980,6 +1037,277 @@ const TeamFairApp = {
 
     const elTabTitle = document.getElementById("tabDashboardTitle");
     if (elTabTitle) elTabTitle.textContent = isLeader ? "Dashboard Nhóm Trưởng" : "Dashboard Thành Viên";
+
+    const TAB_TITLES = {
+      dashboard: isLeader ? "Dashboard Nhóm Trưởng" : "Dashboard Thành Viên",
+      tasks: "Phân Chia Việc",
+      schedule: "Lịch Rảnh Nhóm",
+      meeting: "Phòng Họp Ảo",
+      reviews: "Đánh Giá Chéo",
+      emails: "Thông Báo & Mail",
+      report: "Báo Cáo Nộp Bài"
+    };
+
+    const breadcrumb = document.getElementById("pageBreadcrumb");
+    if (breadcrumb) {
+      breadcrumb.textContent = `TeamFair › ${TAB_TITLES[this.activeTab] || 'Dashboard'}`;
+    }
+
+    const titleEl = document.getElementById("pageMainTitle");
+    if (titleEl) {
+      titleEl.textContent = TAB_TITLES[this.activeTab] || 'Dashboard';
+    }
+  },
+
+  renderHeaderActionButtons() {
+    const container = document.getElementById("pageHeaderActions");
+    if (!container) return;
+
+    const isLeader = this.currentUser?.roleType === "Leader";
+
+    if (this.activeTab === "dashboard") {
+      container.innerHTML = `
+        <div class="tf-role-segmented" title="Đổi góc nhìn hiển thị">
+          <button class="tf-role-segment-btn ${isLeader ? 'active' : ''}" onclick="TeamFairApp.setRoleType('Leader')">Nhóm Trưởng</button>
+          <button class="tf-role-segment-btn ${!isLeader ? 'active' : ''}" onclick="TeamFairApp.setRoleType('Member')">Thành Viên</button>
+        </div>
+      `;
+    } else if (this.activeTab === "tasks") {
+      container.innerHTML = `
+        <button class="btn btn-sm btn-tf-primary text-white" onclick="TeamFairApp.openAddTaskDrawer()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span>+ Giao việc</span>
+        </button>
+        <button class="btn btn-sm btn-tf-outline" onclick="TeamFairApp.openMembersDrawer()">
+          <span>Thành viên</span>
+        </button>
+      `;
+    } else if (this.activeTab === "schedule") {
+      container.innerHTML = `
+        <a href="/event" class="btn btn-sm btn-tf-primary text-white text-decoration-none">
+          <span>+ Khảo sát When2meet</span>
+        </a>
+      `;
+    } else if (this.activeTab === "meeting") {
+      container.innerHTML = `
+        <button class="btn btn-sm btn-tf-primary text-white" onclick="TeamFairApp.enterVirtualMeeting('')">
+          <span>▶️ Mở phòng tức thì</span>
+        </button>
+      `;
+    } else if (this.activeTab === "reviews") {
+      container.innerHTML = `
+        <button class="btn btn-sm btn-tf-primary text-white" onclick="TeamFairApp.switchTab('tasks')">
+          <span>Chọn việc đánh giá</span>
+        </button>
+      `;
+    } else if (this.activeTab === "emails") {
+      container.innerHTML = `
+        <button class="btn btn-sm btn-tf-primary text-white" onclick="TeamFairApp.checkAndSendDeadlineReminders(true)">
+          <span>Quét & gửi nhắc deadline</span>
+        </button>
+      `;
+    } else if (this.activeTab === "report") {
+      container.innerHTML = `
+        <button class="btn btn-sm btn-tf-primary text-white" onclick="TeamFairApp.printReport()">
+          <span>In / Xuất PDF Báo Cáo</span>
+        </button>
+      `;
+    } else {
+      container.innerHTML = '';
+    }
+  },
+
+  setRoleType(role) {
+    if (this.currentUser) {
+      this.currentUser.roleType = role;
+      this.saveUserSession();
+      this.renderAll();
+      this.showToast(`Đã chuyển sang góc nhìn ${role === 'Leader' ? 'Nhóm Trưởng' : 'Thành Viên'}.`, "info");
+    }
+  },
+
+  renderSubrail() {
+    const rail = document.getElementById("secondaryCategoryRail");
+    if (!rail) return;
+
+    const subTasks = document.getElementById("subrail-tasks");
+    const subEmails = document.getElementById("subrail-emails");
+    const subReviews = document.getElementById("subrail-reviews");
+
+    // Hide all subrail sections first
+    subTasks?.classList.add("d-none");
+    subEmails?.classList.add("d-none");
+    subReviews?.classList.add("d-none");
+
+    if (this.activeTab === "tasks") {
+      rail.classList.remove("d-none");
+      subTasks?.classList.remove("d-none");
+      this.renderTasksSubrail();
+    } else if (this.activeTab === "emails") {
+      rail.classList.remove("d-none");
+      subEmails?.classList.remove("d-none");
+      this.renderEmailsSubrail();
+    } else if (this.activeTab === "reviews") {
+      rail.classList.remove("d-none");
+      subReviews?.classList.remove("d-none");
+      this.renderReviewsSubrail();
+    } else {
+      rail.classList.add("d-none");
+    }
+  },
+
+  renderTasksSubrail() {
+    const statusGroup = document.getElementById("subrailTaskStatusGroup");
+    const memberGroup = document.getElementById("subrailTaskMemberGroup");
+    if (!statusGroup || !memberGroup) return;
+
+    const totalTasks = this.state.tasks.length;
+    const todoTasks = this.state.tasks.filter(t => t.status === "todo").length;
+    const doingTasks = this.state.tasks.filter(t => t.status === "doing").length;
+    const reviewTasks = this.state.tasks.filter(t => t.status === "review").length;
+    const doneTasks = this.state.tasks.filter(t => t.status === "done").length;
+
+    const statuses = [
+      { id: "all", name: "Tất cả", count: totalTasks },
+      { id: "todo", name: "Chưa bắt đầu", count: todoTasks },
+      { id: "doing", name: "Đang làm", count: doingTasks },
+      { id: "review", name: "Chờ đánh giá", count: reviewTasks },
+      { id: "done", name: "Đã hoàn thành", count: doneTasks }
+    ];
+
+    statusGroup.innerHTML = statuses.map(s => `
+      <div class="tf-subrail-item ${this.selectedTaskStatus === s.id ? 'active' : ''}" 
+           onclick="TeamFairApp.filterTasksByStatus('${s.id}')">
+        <span>${s.name}</span>
+        <span class="tf-subrail-badge">${s.count}</span>
+      </div>
+    `).join("");
+
+    const members = [
+      { id: "all", name: "Tất cả", count: totalTasks },
+      ...this.state.members.map(m => ({
+        id: m.id,
+        name: m.name,
+        count: this.state.tasks.filter(t => t.assigneeId === m.id).length
+      }))
+    ];
+
+    memberGroup.innerHTML = members.map(m => `
+      <div class="tf-subrail-item ${this.selectedTaskMember === m.id ? 'active' : ''}" 
+           onclick="TeamFairApp.filterTasksByMember('${m.id}')">
+        <span class="text-truncate" style="max-width: 140px;" title="${m.name}">${m.name}</span>
+        <span class="tf-subrail-badge">${m.count}</span>
+      </div>
+    `).join("");
+  },
+
+  filterTasksByStatus(st) {
+    this.selectedTaskStatus = st;
+    const elFilter = document.getElementById("filterTaskStatus");
+    if (elFilter) elFilter.value = st;
+    const label = document.getElementById("taskActiveFilterLabel");
+    if (label) {
+      const map = { all: "Tất cả trạng thái", todo: "Chưa bắt đầu", doing: "Đang làm", review: "Chờ đánh giá", done: "Đã hoàn thành" };
+      label.textContent = map[st] || "Lọc";
+    }
+    this.renderTasksSubrail();
+    this.renderTaskList();
+  },
+
+  filterTasksByMember(memId) {
+    this.selectedTaskMember = memId;
+    const elFilter = document.getElementById("filterTaskMember");
+    if (elFilter) elFilter.value = memId;
+    this.renderTasksSubrail();
+    this.renderTaskList();
+  },
+
+  renderEmailsSubrail() {
+    const group = document.getElementById("subrailEmailGroup");
+    if (!group) return;
+
+    const total = this.state.emails.length;
+    const reminders = this.state.emails.filter(e => e.type === "deadline_reminder" || e.type === "reminder").length;
+    const assigned = this.state.emails.filter(e => e.type === "task_assigned").length;
+    const completed = this.state.emails.filter(e => e.type === "task_completed").length;
+    const sent = total;
+
+    const cats = [
+      { id: "all", name: "Tất cả", count: total },
+      { id: "deadline", name: "Nhắc deadline", count: reminders },
+      { id: "assigned", name: "Giao việc", count: assigned },
+      { id: "completed", name: "Hoàn thành task", count: completed },
+      { id: "sent", name: "Lịch sử đã gửi", count: sent }
+    ];
+
+    group.innerHTML = cats.map(c => `
+      <div class="tf-subrail-item ${this.selectedEmailFilter === c.id ? 'active' : ''}" 
+           onclick="TeamFairApp.filterEmails('${c.id}')">
+        <span>${c.name}</span>
+        <span class="tf-subrail-badge">${c.count}</span>
+      </div>
+    `).join("");
+  },
+
+  filterEmails(cat) {
+    this.selectedEmailFilter = cat;
+    this.renderEmailsSubrail();
+    this.renderEmails();
+  },
+
+  renderReviewsSubrail() {
+    const group = document.getElementById("subrailReviewGroup");
+    if (!group) return;
+
+    const myId = this.currentUser?.id;
+    const pendingMyReview = this.state.tasks.filter(t => t.assigneeId !== myId && t.status !== "todo").length;
+    const reviewedByMe = this.state.reviews.filter(r => r.reviewerId === myId).length;
+    const myResults = this.state.reviews.filter(r => r.revieweeId === myId).length;
+
+    const cats = [
+      { id: "pending", name: "Chờ tôi đánh giá", count: pendingMyReview },
+      { id: "reviewed", name: "Đã đánh giá", count: reviewedByMe },
+      { id: "my_results", name: "Kết quả của tôi", count: myResults }
+    ];
+
+    group.innerHTML = cats.map(c => `
+      <div class="tf-subrail-item ${this.selectedReviewFilter === c.id ? 'active' : ''}" 
+           onclick="TeamFairApp.filterReviews('${c.id}')">
+        <span>${c.name}</span>
+        <span class="tf-subrail-badge">${c.count}</span>
+      </div>
+    `).join("");
+  },
+
+  filterReviews(cat) {
+    this.selectedReviewFilter = cat;
+    this.renderReviewsSubrail();
+    this.renderReviews();
+  },
+
+  openAddTaskDrawer() {
+    const el = document.getElementById("offcanvasAddTask");
+    if (el) {
+      const oc = bootstrap.Offcanvas.getOrCreateInstance(el);
+      oc.show();
+    }
+  },
+
+  openMembersDrawer() {
+    const el = document.getElementById("offcanvasMembers");
+    if (el) {
+      const oc = bootstrap.Offcanvas.getOrCreateInstance(el);
+      oc.show();
+    }
+  },
+
+  openMobileMoreMenu() {
+    const el = document.getElementById("offcanvasMobileMore");
+
+    if (el) {
+      const oc = bootstrap.Offcanvas.getOrCreateInstance(el);
+      oc.show();
+    }
   },
 
   /* ================= DASHBOARD RENDERING (LEADER VS MEMBER) ================= */
@@ -1691,91 +2019,150 @@ const TeamFairApp = {
     }).join("");
   },
 
+  renderTaskCardHtml(t, isLeader) {
+    const assignee = this.state.members.find(m => m.id === t.assigneeId) || { name: "Chưa giao", color: "#64748b", avatar: "??" };
+    const diff = this.getDifficultyLabel(t.difficulty);
+    const st = this.getStatusInfo(t.status);
+    const isMyTask = t.assigneeId === this.currentUser.id;
+
+    let reminderBadge = '';
+    if (t.reminderTiming && t.reminderTiming !== 'none') {
+      let timingText = 'Trước 1 ngày';
+      if (t.reminderTiming === '2_days') timingText = 'Trước 2 ngày';
+      else if (t.reminderTiming === '3_days') timingText = 'Trước 3 ngày';
+      else if (t.reminderTiming === '6_hours') timingText = 'Trước 6 giờ';
+      else if (t.reminderTiming === 'on_deadline') timingText = 'Đúng ngày hạn';
+      else if (t.reminderTiming === 'custom' && t.reminderCustomDateTime) timingText = t.reminderCustomDateTime.replace('T', ' ');
+      reminderBadge = `<span class="badge bg-warning-subtle text-warning border border-warning-subtle small ms-1" title="Cấu hình gửi email nhắc deadline: ${timingText}">Nhắc mail${t.reminderSent ? ' (Đã gửi ✓)' : ''}</span>`;
+    }
+
+    return `
+      <div class="tf-task-card ${isMyTask ? 'border-primary' : ''}">
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
+          <div class="d-flex align-items-center gap-1 flex-wrap">
+            <span class="badge ${st.badge}">${st.label}</span>
+            <span class="badge ${diff.badge}">${diff.label}</span>
+            <span class="badge bg-light text-secondary-tf border">${t.category || "Công việc"}</span>
+            ${reminderBadge}
+            ${isMyTask ? '<span class="badge bg-primary-subtle text-primary fw-bold">Việc của bạn</span>' : ''}
+          </div>
+          <div class="d-flex align-items-center gap-1">
+            <span class="text-secondary-tf small">Hạn: <strong>${t.deadline ? t.deadline.split('-').reverse().join('/') : "Chưa đặt"}</strong></span>
+            ${isLeader ? `<button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="TeamFairApp.handleDeleteTask('${t.id}')">×</button>` : ''}
+          </div>
+        </div>
+
+        <h6 class="fw-bold text-main mb-1">${t.title}</h6>
+        <p class="text-secondary-tf small mb-2">${t.description || "Không có mô tả chi tiết."}</p>
+
+        <div class="d-flex align-items-center justify-content-between pt-2 border-top gap-2 flex-wrap">
+          <div class="d-flex align-items-center gap-2">
+            <span class="tf-avatar" style="background-color: ${assignee.color}; width: 26px; height: 26px; font-size: 0.7rem;">${assignee.avatar}</span>
+            <span class="small fw-semibold text-main">${assignee.name}</span>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <span class="small text-secondary-tf"><strong>${t.progress}%</strong></span>
+            <div class="progress" style="width: 50px; height: 5px;">
+              <div class="progress-bar ${t.progress === 100 ? 'bg-success' : 'bg-primary'}" style="width: ${t.progress}%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-end gap-1 mt-2 pt-2 border-top">
+          <button class="btn btn-sm btn-light border py-0 px-2 small" onclick="TeamFairApp.quickUpdateProgress('${t.id}')">
+            Tiến độ
+          </button>
+          <button class="btn btn-sm btn-light border py-0 px-2 small" onclick="TeamFairApp.sendTaskReminderEmail('${t.id}')" title="Gửi email nhắc nhở">
+            Nhắc mail
+          </button>
+          <button class="btn btn-sm btn-tf-purple py-0 px-2 small text-white" onclick="TeamFairApp.openReviewModal('${t.id}')">
+            Đánh giá
+          </button>
+        </div>
+      </div>
+    `;
+  },
+
   renderTaskList() {
     const container = document.getElementById("taskListContainer");
     if (!container) return;
 
-    const filterVal = document.getElementById("filterTaskMember")?.value || "all";
-    const statusVal = document.getElementById("filterTaskStatus")?.value || "all";
+    const filterVal = document.getElementById("filterTaskMember")?.value || this.selectedTaskMember || "all";
+    const statusVal = document.getElementById("filterTaskStatus")?.value || this.selectedTaskStatus || "all";
 
     let tasks = [...this.state.tasks];
     if (filterVal !== "all") tasks = tasks.filter(t => t.assigneeId === filterVal);
     if (statusVal !== "all") tasks = tasks.filter(t => t.status === statusVal);
 
     if (!tasks.length) {
-      container.innerHTML = `<div class="p-5 text-center text-muted">Chưa có công việc nào.</div>`;
+      container.innerHTML = `<div class="p-5 text-center text-secondary-tf">Chưa có công việc nào trong mục này. Bấm nút <strong>"+ Giao việc"</strong> để tạo công việc mới!</div>`;
       return;
     }
 
     const isLeader = this.currentUser.roleType === "Leader";
 
-    container.innerHTML = tasks.map(t => {
-      const assignee = this.state.members.find(m => m.id === t.assigneeId) || { name: "Chưa giao", color: "#64748b", avatar: "??" };
-      const diff = this.getDifficultyLabel(t.difficulty);
-      const st = this.getStatusInfo(t.status);
-      const isMyTask = t.assigneeId === this.currentUser.id;
+    // If status is "all", render Kanban 4 columns (Requirement 6)
+    if (statusVal === "all") {
+      const colTodo = tasks.filter(t => t.status === "todo");
+      const colDoing = tasks.filter(t => t.status === "doing");
+      const colReview = tasks.filter(t => t.status === "review");
+      const colDone = tasks.filter(t => t.status === "done");
 
-      let reminderBadge = '';
-      if (t.reminderTiming && t.reminderTiming !== 'none') {
-        let timingText = 'Trước 1 ngày';
-        if (t.reminderTiming === '2_days') timingText = 'Trước 2 ngày';
-        else if (t.reminderTiming === '3_days') timingText = 'Trước 3 ngày';
-        else if (t.reminderTiming === '6_hours') timingText = 'Trước 6 giờ';
-        else if (t.reminderTiming === 'on_deadline') timingText = 'Đúng ngày hạn';
-        else if (t.reminderTiming === 'custom' && t.reminderCustomDateTime) timingText = t.reminderCustomDateTime.replace('T', ' ');
-        reminderBadge = `<span class="badge bg-warning-subtle text-warning border border-warning-subtle small ms-1" title="Cấu hình gửi email nhắc deadline: ${timingText}">Nhắc mail: ${timingText}${t.reminderSent ? ' (Đã gửi ✓)' : ''}</span>`;
-      }
-
-      return `
-        <div class="card mb-3 border shadow-sm ${isMyTask ? 'border-primary' : ''}">
-          <div class="card-body p-3">
-            <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
-              <div class="d-flex align-items-center gap-1 flex-wrap">
-                <span class="badge ${st.badge}">${st.label}</span>
-                <span class="badge ${diff.badge}">${diff.label}</span>
-                <span class="badge bg-light text-slate-600 border">${t.category || "Công việc"}</span>
-                ${reminderBadge}
-                ${isMyTask ? '<span class="badge bg-primary-subtle text-primary fw-bold">Việc của bạn</span>' : ''}
-              </div>
-              <div class="d-flex align-items-center gap-2">
-                <span class="text-muted small">Hạn: <strong>${t.deadline ? t.deadline.split('-').reverse().join('/') : "Chưa đặt"}</strong></span>
-                ${isLeader ? `<button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="TeamFairApp.handleDeleteTask('${t.id}')">×</button>` : ''}
-              </div>
+      container.innerHTML = `
+        <div class="tf-kanban-board">
+          <!-- Col 1: Chưa bắt đầu -->
+          <div class="tf-kanban-col">
+            <div class="tf-kanban-header">
+              <span class="tf-kanban-title">Chưa bắt đầu</span>
+              <span class="badge bg-light text-secondary-tf border">${colTodo.length}</span>
             </div>
+            <div class="tf-kanban-items">
+              ${colTodo.map(t => this.renderTaskCardHtml(t, isLeader)).join("") || '<div class="text-secondary-tf small p-3 text-center">Trống</div>'}
+            </div>
+          </div>
 
-            <h6 class="fw-bold text-slate-900 mb-1">${t.title}</h6>
-            <p class="text-muted small mb-2">${t.description || "Không có mô tả chi tiết."}</p>
+          <!-- Col 2: Đang làm -->
+          <div class="tf-kanban-col">
+            <div class="tf-kanban-header">
+              <span class="tf-kanban-title text-primary">Đang làm</span>
+              <span class="badge bg-primary-subtle text-primary border">${colDoing.length}</span>
+            </div>
+            <div class="tf-kanban-items">
+              ${colDoing.map(t => this.renderTaskCardHtml(t, isLeader)).join("") || '<div class="text-secondary-tf small p-3 text-center">Trống</div>'}
+            </div>
+          </div>
 
-            <div class="row align-items-center g-2 pt-2 border-top">
-              <div class="col-md-4 d-flex align-items-center gap-2">
-                <span class="tf-avatar" style="background-color: ${assignee.color}; width: 28px; height: 28px; font-size: 0.75rem;">${assignee.avatar}</span>
-                <span class="small fw-semibold text-slate-800">${assignee.name}</span>
-              </div>
-              <div class="col-md-4">
-                <div class="d-flex justify-content-between small text-muted mb-1">
-                  <span>Tiến độ</span>
-                  <strong>${t.progress}%</strong>
-                </div>
-                <div class="progress" style="height: 6px;">
-                  <div class="progress-bar ${t.progress === 100 ? 'bg-success' : 'bg-primary'}" style="width: ${t.progress}%;"></div>
-                </div>
-              </div>
-              <div class="col-md-4 text-md-end d-flex justify-content-md-end gap-1 flex-wrap">
-                <button class="btn btn-sm btn-light border py-1" onclick="TeamFairApp.quickUpdateProgress('${t.id}')">
-                  Tiến độ
-                </button>
-                <button class="btn btn-sm btn-light border py-1" onclick="TeamFairApp.sendTaskReminderEmail('${t.id}')" title="Gửi email nhắc nhở trực tiếp ngay bây giờ">
-                  Nhắc mail
-                </button>
-                <button class="btn btn-sm btn-tf-indigo py-1 text-white" onclick="TeamFairApp.openReviewModal('${t.id}')">
-                  Đánh giá
-                </button>
-              </div>
+          <!-- Col 3: Chờ đánh giá -->
+          <div class="tf-kanban-col">
+            <div class="tf-kanban-header">
+              <span class="tf-kanban-title text-warning">Chờ đánh giá</span>
+              <span class="badge bg-warning-subtle text-warning border">${colReview.length}</span>
+            </div>
+            <div class="tf-kanban-items">
+              ${colReview.map(t => this.renderTaskCardHtml(t, isLeader)).join("") || '<div class="text-secondary-tf small p-3 text-center">Trống</div>'}
+            </div>
+          </div>
+
+          <!-- Col 4: Đã hoàn thành -->
+          <div class="tf-kanban-col">
+            <div class="tf-kanban-header">
+              <span class="tf-kanban-title text-success">Đã hoàn thành</span>
+              <span class="badge bg-success-subtle text-success border">${colDone.length}</span>
+            </div>
+            <div class="tf-kanban-items">
+              ${colDone.map(t => this.renderTaskCardHtml(t, isLeader)).join("") || '<div class="text-secondary-tf small p-3 text-center">Trống</div>'}
             </div>
           </div>
         </div>
       `;
-    }).join("");
+    } else {
+      // Direct cards list for filtered status
+      container.innerHTML = `
+        <div class="row g-3">
+          ${tasks.map(t => `<div class="col-lg-6">${this.renderTaskCardHtml(t, isLeader)}</div>`).join("")}
+        </div>
+      `;
+    }
   },
 
   handleAddTask() {
@@ -1847,6 +2234,9 @@ const TeamFairApp = {
 
     document.getElementById("taskTitle").value = "";
     document.getElementById("taskDesc").value = "";
+
+    const ocTask = bootstrap.Offcanvas.getInstance(document.getElementById("offcanvasAddTask"));
+    if (ocTask) ocTask.hide();
   },
 
   handleAddMember() {
@@ -1902,6 +2292,9 @@ const TeamFairApp = {
     document.getElementById("memberName").value = "";
     if (document.getElementById("memberEmail")) document.getElementById("memberEmail").value = "";
     if (document.getElementById("memberRole")) document.getElementById("memberRole").value = "";
+
+    const ocMem = bootstrap.Offcanvas.getInstance(document.getElementById("offcanvasMembers"));
+    if (ocMem) ocMem.hide();
   },
 
   handleRemoveMember(id) {
@@ -2322,42 +2715,105 @@ const TeamFairApp = {
     const listContainer = document.getElementById("reviewsListContainer");
     if (!listContainer) return;
 
-    if (!this.state.reviews.length) {
-      listContainer.innerHTML = `<div class="p-5 text-center text-muted">Chưa có đánh giá chéo nào được gửi. Khi hoàn thành công việc, hãy bấm nút "Đánh giá chéo" để đánh giá đồng đội!</div>`;
+    const myId = this.currentUser?.id;
+
+    if (this.selectedReviewFilter === "pending") {
+      // Đầu việc chờ đánh giá chéo
+      const eligibleTasks = this.state.tasks.filter(t => (!myId || t.assigneeId !== myId) && t.status !== "todo");
+      if (!eligibleTasks.length) {
+        listContainer.innerHTML = `<div class="p-5 text-center text-muted">Hiện chưa có đầu việc nào của đồng đội sẵn sàng để bạn đánh giá. Khi đồng đội thực hiện hoặc hoàn thành task, các đầu việc sẽ hiển thị tại đây!</div>`;
+        return;
+      }
+
+      listContainer.innerHTML = `
+        <div class="row g-3">
+          ${eligibleTasks.map(t => {
+        const assignee = this.state.members.find(m => m.id === t.assigneeId) || { name: "Thành viên", avatar: "??" };
+        const myRev = this.state.reviews.find(r => r.taskId === t.id && (!myId || r.reviewerId === myId));
+        const statusLabel = t.status === "done" ? "Đã xong" : (t.status === "review" ? "Chờ duyệt" : "Đang làm");
+        const statusBadgeClass = t.status === "done" ? "bg-success-subtle text-success" : (t.status === "review" ? "bg-warning-subtle text-warning" : "bg-primary-subtle text-primary");
+
+        return `
+              <div class="col-12 col-md-6">
+                <div class="tf-card p-3 border h-100 d-flex flex-column justify-content-between">
+                  <div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <span class="badge ${statusBadgeClass}">${statusLabel}</span>
+                      <span class="badge bg-light text-secondary-tf border font-monospace">Hạn: ${t.deadline || "Chưa đặt"}</span>
+                    </div>
+                    <h6 class="fw-bold text-main mb-2">${t.title}</h6>
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                      <span class="badge rounded-circle p-2 text-white bg-primary" style="width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px;">
+                        ${assignee.avatar || (assignee.name ? assignee.name.substring(0, 2).toUpperCase() : "TV")}
+                      </span>
+                      <span class="small text-secondary-tf">Người thực hiện: <strong class="text-main">${assignee.name}</strong></span>
+                    </div>
+                  </div>
+                  <div class="pt-2 border-top d-flex justify-content-between align-items-center">
+                    ${myRev ? `
+                      <span class="badge bg-success-subtle text-success small">✓ Bạn đã chấm: ${((myRev.quality + myRev.punctuality + myRev.effort + myRev.cooperation) / 4).toFixed(1)}★</span>
+                      <button class="btn btn-sm btn-tf-outline" onclick="TeamFairApp.openReviewModal('${t.id}')">Chấm lại</button>
+                    ` : `
+                      <span class="text-secondary-tf small">Chưa đánh giá</span>
+                      <button class="btn btn-sm btn-tf-primary text-white fw-semibold" onclick="TeamFairApp.openReviewModal('${t.id}')">
+                        ★ Chấm điểm chéo
+                      </button>
+                    `}
+                  </div>
+                </div>
+              </div>
+            `;
+      }).join("")}
+        </div>
+      `;
       return;
     }
 
-    listContainer.innerHTML = this.state.reviews.map(rev => {
+    // Lọc danh sách đánh giá: "reviewed" (tôi đã đánh giá) hoặc "my_results" (kết quả của tôi)
+    let reviewsToShow = this.state.reviews;
+    if (this.selectedReviewFilter === "reviewed") {
+      reviewsToShow = this.state.reviews.filter(r => !myId || r.reviewerId === myId);
+    } else if (this.selectedReviewFilter === "my_results") {
+      reviewsToShow = this.state.reviews.filter(r => !myId || r.revieweeId === myId);
+    }
+
+    if (!reviewsToShow.length) {
+      const msg = this.selectedReviewFilter === "reviewed"
+        ? "Bạn chưa gửi đánh giá chéo nào cho đồng đội."
+        : "Chưa có đồng đội nào gửi đánh giá cho bạn.";
+      listContainer.innerHTML = `<div class="p-5 text-center text-muted">${msg}</div>`;
+      return;
+    }
+
+    listContainer.innerHTML = reviewsToShow.map(rev => {
       const reviewer = this.state.members.find(m => m.id === rev.reviewerId) || { name: "Thành viên", avatar: "??" };
       const reviewee = this.state.members.find(m => m.id === rev.revieweeId) || { name: "Thành viên", avatar: "??" };
       const task = this.state.tasks.find(t => t.id === rev.taskId) || { title: "Công việc nhóm" };
       const avg = ((rev.quality + rev.punctuality + rev.effort + rev.cooperation) / 4).toFixed(1);
 
       return `
-        <div class="card mb-3 border shadow-sm">
-          <div class="card-body p-3">
-            <div class="d-flex justify-content-between align-items-start mb-2">
-              <div>
-                <span class="badge bg-success-subtle text-success fw-bold">${avg} / 5.0</span>
-                <span class="text-muted small ms-2">${rev.createdAt}</span>
-              </div>
-              <span class="badge bg-light text-slate-700 border">Mã đầu việc: ${task.id}</span>
+        <div class="tf-card mb-3 p-3 border">
+          <div class="d-flex justify-content-between align-items-start mb-2 flex-wrap gap-2">
+            <div>
+              <span class="badge bg-success-subtle text-success fw-bold px-2 py-1">${avg} / 5.0 ★</span>
+              <span class="text-secondary-tf small ms-2">${rev.createdAt}</span>
             </div>
-            <h6 class="fw-bold text-slate-900 mb-1">${task.title}</h6>
-            <div class="small text-slate-600 mb-2">
-              Người đánh giá: <strong>${reviewer.name}</strong> ➔ Người được đánh giá: <strong class="text-primary">${reviewee.name}</strong>
-            </div>
+            <span class="badge bg-light text-secondary-tf border font-monospace">Mã đầu việc: ${task.id}</span>
+          </div>
+          <h6 class="fw-bold text-main mb-1">${task.title}</h6>
+          <div class="small text-secondary-tf mb-3">
+            Người đánh giá: <strong class="text-main">${reviewer.name}</strong> ➔ Người được đánh giá: <strong class="text-purple">${reviewee.name}</strong>
+          </div>
 
-            <div class="row g-2 mb-2 p-2 bg-light rounded-3 small">
-              <div class="col-6 col-md-3">Chất lượng: <strong>${rev.quality}</strong></div>
-              <div class="col-6 col-md-3">Đúng hạn: <strong>${rev.punctuality}</strong></div>
-              <div class="col-6 col-md-3">Độ khó nỗ lực: <strong>${rev.effort}</strong></div>
-              <div class="col-6 col-md-3">Hợp tác: <strong>${rev.cooperation}</strong></div>
-            </div>
+          <div class="row g-2 mb-3 p-2 bg-light rounded-3 small">
+            <div class="col-6 col-md-3">Chất lượng: <strong>${rev.quality} ★</strong></div>
+            <div class="col-6 col-md-3">Đúng hạn: <strong>${rev.punctuality} ★</strong></div>
+            <div class="col-6 col-md-3">Độ khó nỗ lực: <strong>${rev.effort} ★</strong></div>
+            <div class="col-6 col-md-3">Hợp tác: <strong>${rev.cooperation} ★</strong></div>
+          </div>
 
-            <div class="p-2 border-start border-4 border-success bg-white small fst-italic">
-              "${rev.comment || "Không có nhận xét thêm."}"
-            </div>
+          <div class="p-2 border-start border-4 border-success bg-white small fst-italic rounded-end">
+            "${rev.comment || "Không có nhận xét thêm."}"
           </div>
         </div>
       `;
@@ -2450,10 +2906,25 @@ const TeamFairApp = {
       return;
     }
 
-    listContainer.innerHTML = this.state.emails.map(em => {
+    // Áp dụng bộ lọc selectedEmailFilter
+    let filteredEmails = this.state.emails;
+    if (this.selectedEmailFilter === "deadline") {
+      filteredEmails = this.state.emails.filter(e => e.type === "deadline_reminder" || e.type === "reminder");
+    } else if (this.selectedEmailFilter === "assigned") {
+      filteredEmails = this.state.emails.filter(e => e.type === "task_assigned");
+    } else if (this.selectedEmailFilter === "completed") {
+      filteredEmails = this.state.emails.filter(e => e.type === "task_completed");
+    }
+
+    if (!filteredEmails.length) {
+      listContainer.innerHTML = `<div class="p-5 text-center text-muted">Không tìm thấy thông báo email nào thuộc danh mục này.</div>`;
+      return;
+    }
+
+    listContainer.innerHTML = filteredEmails.map(em => {
       let typeBadge = '<span class="badge bg-primary-subtle text-primary border border-primary-subtle me-1">Thông báo</span>';
       if (em.type === 'task_completed') {
-        typeBadge = '<span class="badge bg-success-subtle text-success border border-success-subtle me-1">Hoàn thành nhiệm vụ (Gửi toàn team)</span>';
+        typeBadge = '<span class="badge bg-success-subtle text-success border border-success-subtle me-1">Hoàn thành nhiệm vụ</span>';
       } else if (em.type === 'deadline_reminder' || em.type === 'reminder') {
         typeBadge = '<span class="badge bg-warning-subtle text-warning border border-warning-subtle me-1">Nhắc nhở hạn chót</span>';
       } else if (em.type === 'task_assigned') {
@@ -2463,26 +2934,24 @@ const TeamFairApp = {
       }
 
       return `
-        <div class="card mb-3 border shadow-sm">
-          <div class="card-body p-3">
-            <div class="d-flex justify-content-between align-items-start mb-2 flex-wrap gap-2">
-              <div class="d-flex align-items-center flex-wrap gap-1">
-                ${typeBadge}
-                <span class="badge bg-success text-white">✓ Đã gửi</span>
-                <span class="text-muted small ms-2">${em.sentAt}</span>
-              </div>
-              <span class="badge bg-light text-slate-700 border">Gửi đến: ${em.to}</span>
+        <div class="tf-card mb-3 p-3 border">
+          <div class="d-flex justify-content-between align-items-start mb-2 flex-wrap gap-2">
+            <div class="d-flex align-items-center flex-wrap gap-1">
+              ${typeBadge}
+              <span class="badge bg-success text-white">✓ Đã gửi</span>
+              <span class="text-secondary-tf small ms-2">${em.sentAt}</span>
             </div>
-            <h6 class="fw-bold text-slate-900 mb-1">${em.subject}</h6>
-            <div class="small text-slate-600 mb-2">Người nhận: <strong>${em.toName}</strong> &lt;${em.to}&gt;</div>
-            <div class="p-3 bg-light rounded-3 small text-slate-800" style="white-space: pre-line;">
-              ${em.content}
-            </div>
-            <div class="text-end mt-2">
-              <button class="btn btn-sm btn-outline-primary" onclick="TeamFairApp.previewEmailModal('${em.id}')">
-                Xem định dạng HTML chuẩn
-              </button>
-            </div>
+            <span class="badge bg-light text-secondary-tf border font-monospace">Gửi đến: ${em.to}</span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+            <h6 class="fw-bold text-main mb-0">${em.subject}</h6>
+            <button class="btn btn-sm btn-tf-outline" onclick="TeamFairApp.previewEmailModal('${em.id}')">
+              Xem định dạng HTML chuẩn
+            </button>
+          </div>
+          <div class="small text-secondary-tf mb-2">Người nhận: <strong class="text-main">${em.toName}</strong> &lt;${em.to}&gt;</div>
+          <div class="p-3 bg-light rounded-3 small text-main" style="white-space: pre-line;">
+            ${em.content}
           </div>
         </div>
       `;
@@ -2928,10 +3397,12 @@ const TeamFairApp = {
       {
         id: "task_demo_1",
         title: "Thiết kế wireframe & prototype giao diện",
+        assigneeId: "mem_demo_2",
         assignedTo: "mem_demo_2",
         deadline: "2026-10-25",
         difficulty: 4,
         status: "done",
+        progress: 100,
         desc: "Thiết kế UI/UX trên Figma theo chuẩn Tailwind và Material Design",
         submissionLink: "https://figma.com/file/demo-prototype-nhom05",
         submissionNote: "Đã hoàn thành 100% các màn hình chính và responsive mobile.",
@@ -2941,10 +3412,12 @@ const TeamFairApp = {
       {
         id: "task_demo_2",
         title: "Thiết kế kiến trúc CSDL & EF Core Migrations",
+        assigneeId: "mem_demo_3",
         assignedTo: "mem_demo_3",
         deadline: "2026-10-28",
         difficulty: 4,
         status: "done",
+        progress: 100,
         desc: "Thiết kế ERD, quan hệ 1-n, bảng Users, Teams, Tasks, Reviews",
         submissionLink: "https://github.com/teamfair-demo/backend-api",
         submissionNote: "Database đã migrate lên Azure SQL chạy ổn định.",
@@ -2954,10 +3427,12 @@ const TeamFairApp = {
       {
         id: "task_demo_3",
         title: "Xây dựng luồng phân quyền và bảo mật JWT / Google OAuth",
+        assigneeId: "mem_demo_1",
         assignedTo: "mem_demo_1",
         deadline: "2026-11-02",
         difficulty: 5,
         status: "review",
+        progress: 90,
         desc: "Cấu hình Google OAuth, kiểm soát vai trò Nhóm Trưởng và Thành Viên",
         submissionLink: "https://github.com/teamfair-demo/auth-service",
         submissionNote: "Đang chờ nhóm test nghiệm thu luồng callback.",
@@ -2967,10 +3442,12 @@ const TeamFairApp = {
       {
         id: "task_demo_4",
         title: "Viết Unit Tests và kịch bản kiểm thử luồng chấm điểm",
+        assigneeId: "mem_demo_4",
         assignedTo: "mem_demo_4",
         deadline: "2026-11-05",
         difficulty: 3,
         status: "doing",
+        progress: 50,
         desc: "Viết kiểm thử tự động xUnit cho thuật toán tính KPI đóng góp",
         submissionLink: "",
         submissionNote: "",
@@ -2980,10 +3457,12 @@ const TeamFairApp = {
       {
         id: "task_demo_5",
         title: "Tích hợp phòng họp ảo và lên lịch rảnh nhóm",
+        assigneeId: "mem_demo_1",
         assignedTo: "mem_demo_1",
         deadline: "2026-11-08",
         difficulty: 3,
         status: "doing",
+        progress: 40,
         desc: "Mô phỏng grid webcam và chia sẻ màn hình trực tuyến",
         submissionLink: "",
         submissionNote: "",
@@ -2993,10 +3472,12 @@ const TeamFairApp = {
       {
         id: "task_demo_6",
         title: "Hoàn thiện Slide thuyết trình và Báo cáo tổng kết đồ án",
+        assigneeId: "mem_demo_2",
         assignedTo: "mem_demo_2",
         deadline: "2026-11-15",
         difficulty: 2,
         status: "todo",
+        progress: 0,
         desc: "Tổng hợp số liệu từ TeamFair xuất ra báo cáo PDF nộp giảng viên",
         submissionLink: "",
         submissionNote: "",
@@ -3026,22 +3507,40 @@ const TeamFairApp = {
 
     const demoReviews = [
       {
+        id: "rev_demo_1",
+        taskId: "task_demo_1",
         reviewerId: "mem_demo_1",
         revieweeId: "mem_demo_2",
-        criteria: { quality: 5, deadline: 5, effort: 4, cooperation: 5 },
-        comment: "Mai thiết kế UI rất thẩm mỹ, phối màu dịu mắt và giao nộp đúng hẹn."
+        quality: 5,
+        punctuality: 5,
+        effort: 4,
+        cooperation: 5,
+        comment: "Mai thiết kế UI rất thẩm mỹ, phối màu dịu mắt và giao nộp đúng hẹn.",
+        createdAt: "2026-10-25 15:30"
       },
       {
+        id: "rev_demo_2",
+        taskId: "task_demo_2",
         reviewerId: "mem_demo_1",
         revieweeId: "mem_demo_3",
-        criteria: { quality: 5, deadline: 4, effort: 5, cooperation: 4 },
-        comment: "Nam thiết kế CSDL rất chuẩn xác, query tối ưu tốt."
+        quality: 5,
+        punctuality: 4,
+        effort: 5,
+        cooperation: 4,
+        comment: "Nam thiết kế CSDL rất chuẩn xác, query tối ưu tốt.",
+        createdAt: "2026-10-26 10:15"
       },
       {
+        id: "rev_demo_3",
+        taskId: "task_demo_3",
         reviewerId: "mem_demo_2",
         revieweeId: "mem_demo_1",
-        criteria: { quality: 5, deadline: 5, effort: 5, cooperation: 5 },
-        comment: "Nhóm trưởng phân công công việc rõ ràng, theo sát tiến độ và hỗ trợ nhiệt tình."
+        quality: 5,
+        punctuality: 5,
+        effort: 5,
+        cooperation: 5,
+        comment: "Nhóm trưởng phân công công việc rõ ràng, theo sát tiến độ và hỗ trợ nhiệt tình.",
+        createdAt: "2026-10-26 18:00"
       }
     ];
 
@@ -3056,14 +3555,26 @@ const TeamFairApp = {
         {
           id: "email_demo_1",
           to: currentEmail,
+          toName: currentName,
           subject: "[TeamFair] Thông báo giao việc mới: Luồng phân quyền",
-          body: "Chào bạn, Nhóm Trưởng đã giao cho bạn nhiệm vụ: 'Xây dựng luồng phân quyền và bảo mật JWT / Google OAuth'. Hạn chót: 02/11/2026.",
-          date: "21/10/2026 09:00"
+          type: "task_assigned",
+          content: "Chào bạn, Nhóm Trưởng đã giao cho bạn nhiệm vụ: 'Xây dựng luồng phân quyền và bảo mật JWT / Google OAuth'. Hạn chót: 02/11/2026.",
+          sentAt: "2026-10-21 09:00"
+        },
+        {
+          id: "email_demo_2",
+          to: "mai.tran@student.edu.vn",
+          toName: "Trần Thị Mai",
+          subject: "[TeamFair] Nhắc nhở hạn chót: Thiết kế wireframe",
+          type: "deadline_reminder",
+          content: "Chào Mai, đầu việc 'Thiết kế wireframe' sẽ tới hạn vào ngày 25/10/2026. Vui lòng cập nhật tiến độ!",
+          sentAt: "2026-10-24 08:30"
         }
       ],
       activities: [
-        { action: "Trần Thị Mai đã nộp minh chứng cho nhiệm vụ 'Thiết kế wireframe'", time: "Hôm nay 14:20" },
-        { action: "Lê Hoàng Nam đã hoàn thành nhiệm vụ 'Thiết kế kiến trúc CSDL'", time: "Hôm qua 18:30" }
+        { text: "Trần Thị Mai đã nộp minh chứng cho nhiệm vụ 'Thiết kế wireframe'", time: "Hôm nay 14:20", type: "task" },
+        { text: "Lê Hoàng Nam đã hoàn thành nhiệm vụ 'Thiết kế kiến trúc CSDL'", time: "Hôm qua 18:30", type: "task" },
+        { text: "Nguyễn Văn An đã lên lịch họp 'Rà soát tiến độ Sprint 2'", time: "2 ngày trước", type: "meeting" }
       ]
     };
 
