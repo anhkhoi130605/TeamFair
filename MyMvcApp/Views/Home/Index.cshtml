@@ -210,36 +210,52 @@
     </div>
 
     <!-- MAIN APP WORKSPACE VIEW (SHOWN WHEN USER IS LOGGED IN) -->
-    <div id="mainAppWorkspaceView">
-        <!-- Main Navigation Tabs - Fixed into 1 Single Line Row -->
-        <nav class="tf-nav-tabs mb-4">
-            <button class="tf-tab-btn active" data-tab="dashboard">
-                
-                <span id="tabDashboardTitle">Dashboard</span>
-            </button>
-            <button class="tf-tab-btn" data-tab="tasks">
-                
-                <span>Phân Chia Công Việc</span>
-                <span class="badge bg-primary" id="badge-task-count">0/0</span>
-            </button>
-            <button class="tf-tab-btn" data-tab="schedule">
-                
-                <span>Lịch Rảnh Nhóm</span>
-            </button>
-            <button class="tf-tab-btn" data-tab="meeting">
-                
-                <span>Phòng Họp Ảo</span>
-            </button>
-            <button class="tf-tab-btn" data-tab="reviews">
-                
-                <span>Đánh Giá Chéo</span>
-            </button>
-            <button class="tf-tab-btn" data-tab="emails">
-                
-                <span>Thông Báo & Email</span>
-                <span class="badge bg-danger" id="badge-email-count">0</span>
-            </button>
-        </nav>
+    <div id="mainAppWorkspaceView" class="tf-workspace-layout">
+        <!-- Vertical Sidebar Navigation on the Left -->
+        <aside class="tf-sidebar">
+            <div class="tf-sidebar-header">
+                <span class="small fw-bold text-uppercase text-muted" style="letter-spacing: 0.5px; font-size: 0.72rem;">Điều hướng</span>
+            </div>
+            <nav class="tf-nav-tabs">
+                <button class="tf-tab-btn active" data-tab="dashboard">
+                    <span class="tf-tab-icon">📊</span>
+                    <span id="tabDashboardTitle" class="tf-tab-text">Dashboard</span>
+                </button>
+                <button class="tf-tab-btn" data-tab="tasks">
+                    <span class="tf-tab-icon">📋</span>
+                    <span class="tf-tab-text">Phân Chia Việc</span>
+                    <span class="badge bg-primary" id="badge-task-count">0/0</span>
+                </button>
+                <button class="tf-tab-btn" data-tab="schedule">
+                    <span class="tf-tab-icon">📅</span>
+                    <span class="tf-tab-text">Lịch Rảnh Nhóm</span>
+                </button>
+                <button class="tf-tab-btn" data-tab="meeting">
+                    <span class="tf-tab-icon">📹</span>
+                    <span class="tf-tab-text">Phòng Họp Ảo</span>
+                </button>
+                <button class="tf-tab-btn" data-tab="reviews">
+                    <span class="tf-tab-icon">⭐</span>
+                    <span class="tf-tab-text">Đánh Giá Chéo</span>
+                </button>
+                <button class="tf-tab-btn" data-tab="emails">
+                    <span class="tf-tab-icon">🔔</span>
+                    <span class="tf-tab-text">Thông Báo & Mail</span>
+                    <span class="badge bg-danger" id="badge-email-count">0</span>
+                </button>
+
+                <!-- When2meet Scheduler Tool Link -->
+                <div class="pt-2 mt-2 border-top w-100">
+                    <a href="/event" class="tf-tab-btn text-decoration-none w-100 d-flex align-items-center" style="background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d;" title="Tạo khảo sát When2meet">
+                        <span class="tf-tab-icon">🚀</span>
+                        <span class="tf-tab-text fw-bold">When2meet</span>
+                    </a>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content Workspace on the Right -->
+        <main class="tf-main-content">
 
         <!-- TAB 1: DASHBOARDS (2 DISTINCT DASHBOARDS) -->
         <div class="tf-tab-pane" id="pane-dashboard">
@@ -1031,6 +1047,7 @@
                 </div>
             </div>
         </div>
+        </main> <!-- /tf-main-content -->
     </div> <!-- /mainAppWorkspaceView -->
 
     <!-- Footer matching user's original design -->
