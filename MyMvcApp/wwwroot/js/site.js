@@ -125,14 +125,25 @@ const TeamFairApp = {
     }
   },
 
+  getCurrentMember() {
+    if (!this.currentUser) return null;
+    if (!this.state || !Array.isArray(this.state.members)) return null;
+    return this.state.members.find(m =>
+      (this.currentUser.id && m.id === this.currentUser.id) ||
+      (this.currentUser.email && m.email && m.email.toLowerCase() === this.currentUser.email.toLowerCase())
+    );
+  },
+
   async loadState() {
     try {
-      const res = await fetch("/api/state");
+      const emailParam = this.currentUser?.email ? encodeURIComponent(this.currentUser.email) : "";
+      const codeParam = (this.currentUser?.joinCode || this.state?.team?.joinCode) ? encodeURIComponent(this.currentUser?.joinCode || this.state?.team?.joinCode) : "";
+      const res = await fetch(`/api/state?userEmail=${emailParam}&joinCode=${codeParam}`);
       if (res.ok) {
         const data = await res.json();
         if (data && data.success) {
           this.state = {
-            team: data.team || { ...DEFAULT_STATE.team },
+            team: data.team, // null nếu chưa vào nhóm
             members: data.members || [],
             tasks: data.tasks || [],
             schedules: data.schedules || {},
@@ -152,7 +163,8 @@ const TeamFairApp = {
     }
 
     try {
-      const saved = localStorage.getItem("TeamFair_State_v3");
+      const userKey = this.currentUser?.email ? `TeamFair_State_${this.currentUser.email}` : "TeamFair_State_v3";
+      const saved = localStorage.getItem(userKey) || localStorage.getItem("TeamFair_State_v3");
       if (saved) {
         this.state = JSON.parse(saved);
         if (!Array.isArray(this.state.members)) this.state.members = [];
@@ -162,48 +174,50 @@ const TeamFairApp = {
         if (!Array.isArray(this.state.emails)) this.state.emails = [];
         if (!Array.isArray(this.state.activities)) this.state.activities = [];
         if (!this.state.schedules) this.state.schedules = {};
-        if (!this.state.team) this.state.team = { ...DEFAULT_STATE.team };
       } else {
         this.state = JSON.parse(JSON.stringify(DEFAULT_STATE));
+        this.state.team = null;
       }
     } catch (e) {
       this.state = JSON.parse(JSON.stringify(DEFAULT_STATE));
+      this.state.team = null;
     }
 
     this.syncCurrentUserWithMembers();
   },
 
   syncCurrentUserWithMembers() {
-    if (this.currentUser && this.currentUser.roleType === "Member") {
-      const matched = this.state.members.find(m =>
-        m.id === this.currentUser.id ||
-        (m.email && this.currentUser.email && m.email.toLowerCase() === this.currentUser.email.toLowerCase())
-      );
-      if (matched) {
-        this.currentUser = {
-          ...this.currentUser,
-          ...matched,
-          name: this.currentUser.name || matched.name,
-          roleType: "Member"
-        };
-        this.saveUserSession();
+    if (this.currentUser) {
+      const myMember = this.getCurrentMember();
+      if (myMember) {
+        this.currentUser.id = myMember.id;
+        this.currentUser.roleType = myMember.roleType || this.currentUser.roleType || "Member";
+        this.currentUser.role = myMember.role || this.currentUser.role || "Thành viên";
+        if (myMember.name && (!this.currentUser.name || this.currentUser.name === "Thành Viên" || this.currentUser.name === "Trưởng Nhóm")) {
+          this.currentUser.name = myMember.name;
+        }
       }
-      // KHÔNG tự ý ghi đè this.currentUser bằng this.state.members[0] để bảo toàn tài khoản vừa đăng ký/đăng nhập
+      this.saveUserSession();
     }
 
-    if (this.state.members.length > 0 && !this.currentSchedulerMemberId) {
-      this.currentSchedulerMemberId = (this.currentUser && this.currentUser.id !== "leader_root") ? this.currentUser.id : this.state.members[0].id;
+    if (this.state && Array.isArray(this.state.members) && this.state.members.length > 0) {
+      if (!this.currentSchedulerMemberId || !this.state.members.some(m => m.id === this.currentSchedulerMemberId)) {
+        const myMember = this.getCurrentMember();
+        this.currentSchedulerMemberId = myMember ? myMember.id : this.state.members[0].id;
+      }
     }
   },
 
   saveState() {
     try {
-      localStorage.setItem("TeamFair_State_v3", JSON.stringify(this.state));
+      const userKey = this.currentUser?.email ? `TeamFair_State_${this.currentUser.email}` : "TeamFair_State_v3";
+      localStorage.setItem(userKey, JSON.stringify(this.state));
     } catch (e) {
       console.error("Lỗi lưu state local:", e);
     }
 
-    fetch("/api/save-state", {
+    const emailParam = this.currentUser?.email ? encodeURIComponent(this.currentUser.email) : "";
+    fetch(`/api/save-state?userEmail=${emailParam}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(this.state)
@@ -215,7 +229,7 @@ const TeamFairApp = {
         }
       })
       .catch(err => {
-        console.warn("Lỗi sync Azure SQL:", err);
+        console.warn("Lỗi sync DB:", err);
         this.updateDbStatus(false);
       });
   },
@@ -369,6 +383,9 @@ const TeamFairApp = {
       }
 
       this.currentUser = data.user;
+      if (data.team && data.team.joinCode) {
+        this.currentUser.joinCode = data.team.joinCode;
+      }
       this.saveUserSession();
       await this.loadState();
       this.renderAll();
@@ -454,6 +471,9 @@ const TeamFairApp = {
       this.closeGoogleAuthModal();
 
       this.currentUser = data.user;
+      if (data.team && data.team.joinCode) {
+        this.currentUser.joinCode = data.team.joinCode;
+      }
       this.saveUserSession();
       await this.loadState();
       this.renderAll();
@@ -539,6 +559,9 @@ const TeamFairApp = {
     this.currentUser.role = "Trưởng nhóm";
     this.saveUserSession();
 
+    this.currentUser.joinCode = joinCode;
+    this.saveUserSession();
+
     if (serverSuccess) {
       await this.loadState();
       this.renderAll();
@@ -616,11 +639,12 @@ const TeamFairApp = {
       // Khi tham gia thì là Thành viên
       this.currentUser.roleType = "Member";
       this.currentUser.role = "Thành viên";
+      this.currentUser.joinCode = joinCode.trim().toUpperCase();
       this.saveUserSession();
 
       await this.loadState();
       this.renderAll();
-      this.showToast("Tham gia nhóm thành công với vai trò Thành Viên!", "success");
+      this.showToast(data.message || `Tham gia nhóm thành công với mã ${joinCode.trim().toUpperCase()}!`, "success");
     } catch (err) {
       console.error("Lỗi tham gia nhóm:", err);
       alert("Lỗi kết nối khi tham gia nhóm!");
@@ -863,9 +887,12 @@ const TeamFairApp = {
     const leaderView = document.getElementById("dash-leader-view");
     const memberView = document.getElementById("dash-member-view");
 
-    const hasJoinedTeam = this.state.members && this.state.members.length > 0 && (
-      this.currentUser.roleType === "Leader" ||
-      this.state.members.some(m => m.id === this.currentUser.id || (m.email && this.currentUser.email && m.email.toLowerCase() === this.currentUser.email.toLowerCase()))
+    const hasJoinedTeam = Boolean(
+      this.state && 
+      this.state.team && 
+      this.state.team.joinCode && 
+      Array.isArray(this.state.members) && 
+      this.state.members.length > 0
     );
 
     if (!hasJoinedTeam) {
@@ -1099,8 +1126,9 @@ const TeamFairApp = {
 
   /* ------------------- DASHBOARD 2: MEMBER ------------------- */
   renderMemberDashboard() {
-    const memberId = this.currentUser.id;
-    const myTasks = this.state.tasks.filter(t => t.assigneeId === memberId);
+    const myMember = this.getCurrentMember();
+    const memberId = myMember ? myMember.id : this.currentUser.id;
+    const myTasks = this.state.tasks.filter(t => t.assigneeId === memberId || (myMember && t.assigneeId === myMember.id));
     const myDoneTasks = myTasks.filter(t => t.status === "done");
 
     // Compute personal contribution
@@ -1155,40 +1183,62 @@ const TeamFairApp = {
     if (!myTasks.length) {
       container.innerHTML = `
         <div class="p-5 text-center text-muted">
-          
-          <div class="fw-semibold">Bạn chưa có công việc nào được phân công.</div>
-          <div class="small mt-1">Trưởng nhóm sẽ phân chia đầu việc cho bạn sớm nhất.</div>
+          <div class="fs-1 mb-2">📋</div>
+          <div class="fw-semibold text-slate-800">Bạn chưa có công việc nào cần làm.</div>
+          <div class="small text-muted mt-1">Khi nhóm trưởng phân chia nhiệm vụ, công việc và hạn chót sẽ xuất hiện tại đây.</div>
         </div>
       `;
       return;
     }
 
+    const todayStr = new Date().toISOString().split("T")[0];
+
     container.innerHTML = myTasks.map(t => {
       const diff = this.getDifficultyLabel(t.difficulty);
-      const st = this.getStatusInfo(t.status);
+      const isDone = t.status === "done";
+
+      // Deadline badge tính chính xác số ngày còn lại
+      let deadlineBadge = `<span class="badge bg-slate-100 text-slate-600 border">Chưa đặt hạn</span>`;
+      if (t.deadline) {
+        const diffDays = Math.ceil((new Date(t.deadline) - new Date(todayStr)) / (1000 * 60 * 60 * 24));
+        const formattedDate = t.deadline.split("-").reverse().join("/");
+        if (isDone) {
+          deadlineBadge = `<span class="badge bg-success-subtle text-success border border-success-subtle">Hạn: ${formattedDate} (Đã nộp)</span>`;
+        } else if (diffDays < 0) {
+          deadlineBadge = `<span class="badge bg-danger-subtle text-danger border border-danger-subtle fw-bold">⚠️ Quá hạn ${Math.abs(diffDays)} ngày (${formattedDate})</span>`;
+        } else if (diffDays === 0) {
+          deadlineBadge = `<span class="badge bg-danger text-white fw-bold">🔥 Hạn chót: Hôm nay (${formattedDate})</span>`;
+        } else if (diffDays <= 2) {
+          deadlineBadge = `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning fw-bold">⏳ Còn ${diffDays} ngày (${formattedDate})</span>`;
+        } else {
+          deadlineBadge = `<span class="badge bg-light text-slate-700 border">📅 Hạn: ${formattedDate}</span>`;
+        }
+      }
 
       return `
-        <div class="card mb-3 border shadow-sm">
+        <div class="card mb-3 border shadow-sm rounded-3 ${isDone ? 'bg-light-subtle' : 'bg-white'}">
           <div class="card-body p-3">
-            <div class="d-flex justify-content-between align-items-start mb-2">
-              <div class="d-flex align-items-center gap-2">
-                <span class="badge ${st.badge}">${st.label}</span>
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="badge ${isDone ? 'bg-success text-white' : (t.progress > 0 ? 'bg-primary text-white' : 'bg-secondary text-white')}">
+                  ${isDone ? '✓ Hoàn thành' : (t.progress > 0 ? 'Đang thực hiện' : 'Chưa bắt đầu')}
+                </span>
                 <span class="badge ${diff.badge}">${diff.label}</span>
                 <span class="badge bg-light text-slate-700 border">${t.category || "Công việc"}</span>
               </div>
-              <span class="small text-muted">Hạn: <strong>${t.deadline ? t.deadline.split('-').reverse().join('/') : "Chưa đặt"}</strong></span>
+              <div>${deadlineBadge}</div>
             </div>
 
-            <h6 class="fw-bold text-slate-900 mb-1">${t.title}</h6>
+            <h6 class="fw-bold text-slate-900 mb-1" style="font-size: 1rem;">${t.title}</h6>
             <p class="text-muted small mb-3">${t.description || "Không có mô tả chi tiết."}</p>
 
-            <div class="bg-light p-2 rounded-3 mb-3">
+            <div class="p-2 bg-light rounded-3 mb-3 border">
               <div class="d-flex justify-content-between small text-muted mb-1">
-                <span>Tiến độ thực hiện của bạn:</span>
-                <strong class="text-primary">${t.progress}%</strong>
+                <span>Tiến độ thực hiện:</span>
+                <strong class="text-slate-900">${t.progress}%</strong>
               </div>
-              <div class="progress" style="height: 8px;">
-                <div class="progress-bar ${t.progress === 100 ? 'bg-success' : 'bg-primary'}" style="width: ${t.progress}%;"></div>
+              <div class="progress" style="height: 6px;">
+                <div class="progress-bar ${isDone ? 'bg-success' : 'bg-primary'}" style="width: ${t.progress}%;"></div>
               </div>
             </div>
 
@@ -1197,16 +1247,20 @@ const TeamFairApp = {
                 <button type="button" class="btn btn-outline-secondary ${t.progress === 0 ? 'active' : ''}" onclick="TeamFairApp.setMemberTaskProgress('${t.id}', 0)">0%</button>
                 <button type="button" class="btn btn-outline-secondary ${t.progress === 50 ? 'active' : ''}" onclick="TeamFairApp.setMemberTaskProgress('${t.id}', 50)">50%</button>
                 <button type="button" class="btn btn-outline-secondary ${t.progress === 80 ? 'active' : ''}" onclick="TeamFairApp.setMemberTaskProgress('${t.id}', 80)">80%</button>
-                <button type="button" class="btn btn-outline-success ${t.progress === 100 ? 'active' : ''}" onclick="TeamFairApp.setMemberTaskProgress('${t.id}', 100)">100% (Xong)</button>
+                <button type="button" class="btn btn-outline-success ${t.progress === 100 ? 'active' : ''}" onclick="TeamFairApp.setMemberTaskProgress('${t.id}', 100)">100%</button>
               </div>
 
               <div>
-                ${t.status !== 'done' ? `
-                  <button class="btn btn-sm btn-warning text-dark fw-semibold" onclick="TeamFairApp.submitTaskForReview('${t.id}')">
-                    Báo cáo nộp / Gửi duyệt
-                  </button>
+                ${isDone ? `
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="text-success small fw-semibold">✓ Đã nộp bài</span>
+                    ${t.submissionLink ? `<a href="${t.submissionLink}" target="_blank" class="btn btn-sm btn-outline-secondary py-1 px-2 small">Xem bài nộp ↗</a>` : ''}
+                    <button class="btn btn-sm btn-link text-muted p-0 small" onclick="TeamFairApp.openSubmitTaskModal('${t.id}')">[Nộp lại]</button>
+                  </div>
                 ` : `
-                  <span class="text-success small fw-semibold">Đã hoàn thành</span>
+                  <button class="btn btn-sm btn-primary fw-bold px-3 py-1 shadow-sm" onclick="TeamFairApp.openSubmitTaskModal('${t.id}')">
+                    🚀 Nộp Bài / Gửi Minh Chứng
+                  </button>
                 `}
               </div>
             </div>
@@ -1238,6 +1292,61 @@ const TeamFairApp = {
     this.saveState();
     this.renderAll();
     this.showToast(`Đã cập nhật tiến độ ${progressVal}%!`, "success");
+  },
+
+  currentSubmittingTaskId: null,
+
+  openSubmitTaskModal(taskId) {
+    const task = this.state.tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    this.currentSubmittingTaskId = taskId;
+    const modalEl = document.getElementById("modalSubmitTask");
+    const titleEl = document.getElementById("submitTaskTitle");
+    const linkEl = document.getElementById("submitTaskLink");
+    const noteEl = document.getElementById("submitTaskNote");
+
+    if (titleEl) titleEl.textContent = task.title;
+    if (linkEl) linkEl.value = task.submissionLink || "";
+    if (noteEl) noteEl.value = task.submissionNote || "";
+
+    if (modalEl && window.bootstrap && bootstrap.Modal) {
+      const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+      modal.show();
+    } else {
+      this.submitTaskForReview(taskId);
+    }
+  },
+
+  confirmSubmitTask() {
+    if (!this.currentSubmittingTaskId) return;
+    const task = this.state.tasks.find(t => t.id === this.currentSubmittingTaskId);
+    if (!task) return;
+
+    const link = document.getElementById("submitTaskLink")?.value.trim() || "";
+    const note = document.getElementById("submitTaskNote")?.value.trim() || "";
+
+    task.submissionLink = link;
+    task.submissionNote = note || "Đã hoàn thành và nộp minh chứng kết quả.";
+    task.status = "done";
+    task.progress = 100;
+
+    const modalEl = document.getElementById("modalSubmitTask");
+    if (modalEl && window.bootstrap && bootstrap.Modal) {
+      const modal = bootstrap.Modal.getInstance(modalEl);
+      if (modal) modal.hide();
+    }
+
+    this.state.activities.unshift({
+      time: "Vừa xong",
+      text: `${this.currentUser.name} đã nộp bài tập & hoàn thành việc '${task.title}'.`,
+      type: "task"
+    });
+
+    this.notifyTeamTaskCompleted(task, this.currentUser.name);
+    this.saveState();
+    this.renderAll();
+    this.showToast(`Nộp bài thành công cho công việc "${task.title}"!`, "success");
   },
 
   submitTaskForReview(taskId) {

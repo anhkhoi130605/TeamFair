@@ -53,30 +53,37 @@ public class ApiController : ControllerBase
     }
 
     [HttpPost("clear-all")]
-    public async Task<IActionResult> ClearAllData()
+    public async Task<IActionResult> ClearAllData([FromQuery] string? joinCode = null)
     {
         try
         {
+            if (!string.IsNullOrEmpty(joinCode))
+            {
+                var cleanCode = joinCode.Trim().ToUpperInvariant();
+                var team = await _db.Teams.FirstOrDefaultAsync(t => t.JoinCode != null && t.JoinCode.ToUpper() == cleanCode);
+                if (team != null)
+                {
+                    var teamMembers = await _db.Members.Where(m => m.TeamId == team.Id).Include(m => m.ScheduleSlots).ToListAsync();
+                    _db.Members.RemoveRange(teamMembers);
+                    _db.Tasks.RemoveRange(await _db.Tasks.Where(t => t.TeamId == team.Id).ToListAsync());
+                    _db.Meetings.RemoveRange(await _db.Meetings.Where(m => m.TeamId == team.Id).ToListAsync());
+                    _db.ActivityLogs.RemoveRange(await _db.ActivityLogs.Where(a => a.TeamId == team.Id).ToListAsync());
+                    _db.Teams.Remove(team);
+                    await _db.SaveChangesAsync();
+                    return Ok(new { success = true, message = $"Đã dọn sạch dữ liệu của nhóm '{team.Name}'!" });
+                }
+            }
+
             _db.PeerReviews.RemoveRange(await _db.PeerReviews.ToListAsync());
             _db.EmailLogs.RemoveRange(await _db.EmailLogs.ToListAsync());
             _db.ActivityLogs.RemoveRange(await _db.ActivityLogs.ToListAsync());
             _db.Tasks.RemoveRange(await _db.Tasks.ToListAsync());
             _db.Meetings.RemoveRange(await _db.Meetings.ToListAsync());
             _db.Members.RemoveRange(await _db.Members.Include(m => m.ScheduleSlots).ToListAsync());
+            _db.Teams.RemoveRange(await _db.Teams.ToListAsync());
 
-            var team = await _db.Teams.FirstOrDefaultAsync();
-            if (team != null)
-            {
-                team.Name = "Nhóm của tôi";
-                team.Topic = "";
-                team.Subject = "";
-                team.ClassCode = "";
-                team.FinalDeadline = "";
-                team.JoinCode = null;
-                team.CreatedByEmail = null;
-            }
             await _db.SaveChangesAsync();
-            return Ok(new { success = true, message = "Đã dọn sạch toàn bộ mock data trên Azure SQL Database!" });
+            return Ok(new { success = true, message = "Đã dọn sạch toàn bộ dữ liệu mẫu trên cơ sở dữ liệu!" });
         }
         catch (Exception ex)
         {
@@ -104,7 +111,7 @@ public class ApiController : ControllerBase
             var words = dto.Name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
             var avatar = words.Length >= 2
                 ? (words[0][0].ToString() + words[^1][0].ToString()).ToUpper()
-                : (dto.Name.Trim().Length >= 2 ? dto.Name.Trim().Substring(0, 2).ToUpper() : "TV");
+                : (dto.Name.Trim().Length >= 2 ? dto.Name.Trim()[..2].ToUpper() : "TV");
 
             string[] colors = { "#2563eb", "#059669", "#7c3aed", "#ea580c", "#0891b2", "#db2777" };
             var color = colors[Math.Abs(cleanEmail.GetHashCode()) % colors.Length];
@@ -122,7 +129,7 @@ public class ApiController : ControllerBase
             _db.Users.Add(newUser);
             await _db.SaveChangesAsync();
 
-            // Mặc định đăng ký mới: Ai cũng là Thành viên
+            // Đăng ký mới: CHỈ TẠO USER, KHÔNG TỰ TẠO NHÓM
             return Ok(new
             {
                 success = true,
@@ -136,7 +143,8 @@ public class ApiController : ControllerBase
                     color = newUser.Color,
                     roleType = "Member",
                     role = "Thành viên"
-                }
+                },
+                team = (object?)null
             });
         }
         catch (Exception ex)
@@ -162,9 +170,24 @@ public class ApiController : ControllerBase
                 return BadRequest(new { success = false, message = "Email hoặc mật khẩu không chính xác." });
             }
 
-            // Kiểm tra xem user này có đang là trưởng nhóm của nhóm hiện tại không
-            var team = await _db.Teams.FirstOrDefaultAsync();
-            var member = await _db.Members.FirstOrDefaultAsync(m => m.Email.ToLower() == cleanEmail);
+            // Tìm thông tin nhóm mà user này đang tham gia
+            var member = await _db.Members
+                .Where(m => m.Email.ToLower() == cleanEmail && m.TeamId != null)
+                .OrderByDescending(m => m.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            Team? team = null;
+            if (member?.TeamId != null)
+            {
+                team = await _db.Teams.FirstOrDefaultAsync(t => t.Id == member.TeamId);
+            }
+            if (team == null)
+            {
+                team = await _db.Teams
+                    .Where(t => t.CreatedByEmail != null && t.CreatedByEmail.ToLower() == cleanEmail)
+                    .OrderByDescending(t => t.Id)
+                    .FirstOrDefaultAsync();
+            }
 
             bool isLeader = false;
             if (team != null && !string.IsNullOrEmpty(team.CreatedByEmail) && team.CreatedByEmail.ToLower() == cleanEmail)
@@ -189,7 +212,15 @@ public class ApiController : ControllerBase
                     color = user.Color,
                     roleType = isLeader ? "Leader" : "Member",
                     role = isLeader ? "Trưởng nhóm" : "Thành viên"
-                }
+                },
+                team = team != null ? new
+                {
+                    id = team.Id,
+                    name = team.Name,
+                    joinCode = team.JoinCode,
+                    topic = team.Topic,
+                    subject = team.Subject
+                } : null
             });
         }
         catch (Exception ex)
@@ -213,7 +244,6 @@ public class ApiController : ControllerBase
 
             if (user == null)
             {
-                // Tự động tạo tài khoản Google vào Azure SQL Database
                 var displayName = !string.IsNullOrWhiteSpace(dto.Name) ? dto.Name.Trim() : cleanEmail.Split('@')[0];
                 var words = displayName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 var avatar = words.Length >= 2
@@ -237,9 +267,23 @@ public class ApiController : ControllerBase
                 await _db.SaveChangesAsync();
             }
 
-            // Kiểm tra xem user này có đang là trưởng nhóm của nhóm hiện tại không
-            var team = await _db.Teams.FirstOrDefaultAsync();
-            var member = await _db.Members.FirstOrDefaultAsync(m => m.Email.ToLower() == cleanEmail);
+            var member = await _db.Members
+                .Where(m => m.Email.ToLower() == cleanEmail && m.TeamId != null)
+                .OrderByDescending(m => m.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            Team? team = null;
+            if (member?.TeamId != null)
+            {
+                team = await _db.Teams.FirstOrDefaultAsync(t => t.Id == member.TeamId);
+            }
+            if (team == null)
+            {
+                team = await _db.Teams
+                    .Where(t => t.CreatedByEmail != null && t.CreatedByEmail.ToLower() == cleanEmail)
+                    .OrderByDescending(t => t.Id)
+                    .FirstOrDefaultAsync();
+            }
 
             bool isLeader = false;
             if (team != null && !string.IsNullOrEmpty(team.CreatedByEmail) && team.CreatedByEmail.ToLower() == cleanEmail)
@@ -264,7 +308,15 @@ public class ApiController : ControllerBase
                     color = user.Color,
                     roleType = isLeader ? "Leader" : "Member",
                     role = isLeader ? "Trưởng nhóm" : "Thành viên"
-                }
+                },
+                team = team != null ? new
+                {
+                    id = team.Id,
+                    name = team.Name,
+                    joinCode = team.JoinCode,
+                    topic = team.Topic,
+                    subject = team.Subject
+                } : null
             });
         }
         catch (Exception ex)
@@ -283,47 +335,47 @@ public class ApiController : ControllerBase
                 return BadRequest(new { success = false, message = "Vui lòng nhập tên nhóm." });
             }
 
+            var cleanEmail = dto.UserEmail?.Trim().ToLowerInvariant() ?? "";
             var joinCode = "TF-" + Random.Shared.Next(1000, 9999).ToString();
-            var team = await _db.Teams.FirstOrDefaultAsync();
-            if (team == null)
+
+            // TẠO NHÓM MỚI, KHÔNG ĐÈ HOẶC XÓA NHÓM CỦA NGƯỜI KHÁC
+            var team = new Team
             {
-                team = new Team();
-                _db.Teams.Add(team);
-            }
+                Name = dto.TeamName.Trim(),
+                Topic = dto.Topic?.Trim() ?? "",
+                Subject = dto.Subject?.Trim() ?? "",
+                ClassCode = dto.ClassCode?.Trim() ?? "",
+                FinalDeadline = dto.FinalDeadline?.Trim() ?? "",
+                CreatedByEmail = cleanEmail,
+                JoinCode = joinCode,
+                CreatedAt = DateTime.UtcNow
+            };
+            _db.Teams.Add(team);
+            await _db.SaveChangesAsync();
 
-            team.Name = dto.TeamName.Trim();
-            team.Topic = dto.Topic?.Trim() ?? "";
-            team.Subject = dto.Subject?.Trim() ?? "";
-            team.ClassCode = dto.ClassCode?.Trim() ?? "";
-            team.FinalDeadline = dto.FinalDeadline?.Trim() ?? "";
-            team.CreatedByEmail = dto.UserEmail?.Trim().ToLowerInvariant() ?? "";
-            team.JoinCode = joinCode;
-
-            // Xóa các thành viên và dữ liệu cũ của nhóm trước để tạo mới sạch sẽ
-            var existingMembers = await _db.Members.Include(m => m.ScheduleSlots).ToListAsync();
-            _db.Members.RemoveRange(existingMembers);
-            _db.Tasks.RemoveRange(await _db.Tasks.ToListAsync());
-            _db.Meetings.RemoveRange(await _db.Meetings.ToListAsync());
-            _db.PeerReviews.RemoveRange(await _db.PeerReviews.ToListAsync());
-
-            // "khi thành viên muốn tạo nhóm thì phải tự tạo xong hệ thống sẽ set người đầu tiên tạo đó làm nhóm trưởng nhé"
+            // Người tạo là Nhóm Trưởng (TeamId = team.Id)
             var leaderMember = new TeamMember
             {
                 Id = "m_" + Guid.NewGuid().ToString("N")[..8],
+                TeamId = team.Id,
                 Name = string.IsNullOrWhiteSpace(dto.UserName) ? "Trưởng Nhóm" : dto.UserName.Trim(),
-                Email = dto.UserEmail?.Trim().ToLowerInvariant() ?? "",
+                Email = cleanEmail,
                 Role = "Trưởng nhóm",
-                RoleType = "Leader", // set người đầu tiên tạo làm nhóm trưởng
+                RoleType = "Leader",
                 Avatar = string.IsNullOrWhiteSpace(dto.UserName) ? "TN" : dto.UserName.Trim()[..Math.Min(2, dto.UserName.Trim().Length)].ToUpper(),
-                Color = "#059669"
+                Color = "#059669",
+                CreatedAt = DateTime.UtcNow
             };
             _db.Members.Add(leaderMember);
 
+            // Log hoạt động gắn với TeamId để không bị rò rỉ sang nhóm khác
             _db.ActivityLogs.Add(new ActivityLog
             {
+                TeamId = team.Id,
                 Text = $"{leaderMember.Name} đã tạo nhóm '{team.Name}' (Mã nhóm: {joinCode}) và trở thành 👑 Nhóm Trưởng.",
                 Time = "Vừa xong",
-                Type = "team"
+                Type = "team",
+                CreatedAt = DateTime.UtcNow
             });
 
             await _db.SaveChangesAsync();
@@ -368,43 +420,71 @@ public class ApiController : ControllerBase
         try
         {
             var code = dto.JoinCode?.Trim().ToUpperInvariant();
+            if (string.IsNullOrEmpty(code))
+            {
+                return BadRequest(new { success = false, message = "Vui lòng nhập mã nhóm mời." });
+            }
+
             var team = await _db.Teams.FirstOrDefaultAsync(t => t.JoinCode != null && t.JoinCode.ToUpper() == code);
             if (team == null)
             {
-                return BadRequest(new { success = false, message = "Mã nhóm không hợp lệ hoặc nhóm không tồn tại." });
+                return BadRequest(new { success = false, message = $"Mã nhóm '{code}' không tồn tại hoặc đã hết hạn." });
             }
 
             var cleanEmail = dto.UserEmail?.Trim().ToLowerInvariant() ?? "";
-            var existingMember = await _db.Members.FirstOrDefaultAsync(m => m.Email.ToLower() == cleanEmail);
+            var cleanName = !string.IsNullOrWhiteSpace(dto.UserName) ? dto.UserName.Trim() : (cleanEmail.Contains('@') ? cleanEmail.Split('@')[0] : "Thành viên");
+
+            // Kiểm tra xem đã có mặt trong nhóm NÀY chưa
+            var existingMember = await _db.Members.FirstOrDefaultAsync(m => m.TeamId == team.Id && m.Email.ToLower() == cleanEmail);
             if (existingMember != null)
             {
                 return Ok(new
                 {
                     success = true,
-                    message = "Bạn đã có mặt trong nhóm này!",
+                    message = $"Bạn đã là thành viên trong nhóm '{team.Name}'!",
                     member = existingMember,
-                    roleType = existingMember.RoleType
+                    roleType = existingMember.RoleType,
+                    team = new
+                    {
+                        id = team.Id,
+                        name = team.Name,
+                        joinCode = team.JoinCode,
+                        topic = team.Topic,
+                        subject = team.Subject
+                    }
                 });
             }
 
-            // Ai tham gia cũng là Thành viên
+            var words = cleanName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var avatar = words.Length >= 2
+                ? (words[0][0].ToString() + words[^1][0].ToString()).ToUpper()
+                : (cleanName.Length >= 2 ? cleanName[..2].ToUpper() : "TV");
+
+            string[] colors = { "#2563eb", "#059669", "#7c3aed", "#ea580c", "#0891b2", "#db2777" };
+            var color = colors[Math.Abs(cleanEmail.GetHashCode()) % colors.Length];
+
+            // Thêm mới thành viên và GẮN ĐÚNG TeamId = team.Id
             var newMember = new TeamMember
             {
                 Id = "m_" + Guid.NewGuid().ToString("N")[..8],
-                Name = dto.UserName.Trim(),
+                TeamId = team.Id,
+                Name = cleanName,
                 Email = cleanEmail,
                 Role = "Thành viên",
                 RoleType = "Member",
-                Avatar = dto.UserName.Trim()[..Math.Min(2, dto.UserName.Trim().Length)].ToUpper(),
-                Color = "#2563eb"
+                Avatar = avatar,
+                Color = color,
+                CreatedAt = DateTime.UtcNow
             };
             _db.Members.Add(newMember);
 
             _db.ActivityLogs.Add(new ActivityLog
             {
+                TeamId = team.Id,
                 Text = $"{newMember.Name} đã tham gia vào nhóm '{team.Name}' với tư cách Thành viên.",
                 Time = "Vừa xong",
-                Type = "member"
+                Type = "member",
+                CreatedAt = DateTime.UtcNow
             });
 
             await _db.SaveChangesAsync();
@@ -414,7 +494,15 @@ public class ApiController : ControllerBase
                 success = true,
                 message = $"Tham gia nhóm '{team.Name}' thành công!",
                 member = newMember,
-                roleType = "Member"
+                roleType = "Member",
+                team = new
+                {
+                    id = team.Id,
+                    name = team.Name,
+                    joinCode = team.JoinCode,
+                    topic = team.Topic,
+                    subject = team.Subject
+                }
             });
         }
         catch (Exception ex)
@@ -424,24 +512,89 @@ public class ApiController : ControllerBase
     }
 
     [HttpGet("state")]
-    public async Task<IActionResult> GetState()
+    public async Task<IActionResult> GetState([FromQuery] string? userEmail = null, [FromQuery] string? joinCode = null)
     {
         try
         {
-            var team = await _db.Teams.FirstOrDefaultAsync();
-            if (team == null)
+            Team? team = null;
+            var cleanEmail = userEmail?.Trim().ToLowerInvariant();
+            var cleanCode = joinCode?.Trim().ToUpperInvariant();
+
+            if (!string.IsNullOrEmpty(cleanCode))
             {
-                team = new Team { Name = "Nhóm của tôi" };
-                _db.Teams.Add(team);
-                await _db.SaveChangesAsync();
+                team = await _db.Teams.FirstOrDefaultAsync(t => t.JoinCode != null && t.JoinCode.ToUpper() == cleanCode);
             }
 
-            var members = await _db.Members.Include(m => m.ScheduleSlots).ToListAsync();
-            var tasks = await _db.Tasks.ToListAsync();
-            var meetings = await _db.Meetings.ToListAsync();
-            var reviews = await _db.PeerReviews.ToListAsync();
-            var emails = await _db.EmailLogs.ToListAsync();
-            var activities = await _db.ActivityLogs.OrderByDescending(a => a.Id).Take(15).ToListAsync();
+            if (team == null && !string.IsNullOrEmpty(cleanEmail))
+            {
+                var member = await _db.Members
+                    .Where(m => m.Email.ToLower() == cleanEmail && m.TeamId != null)
+                    .OrderByDescending(m => m.CreatedAt)
+                    .FirstOrDefaultAsync();
+
+                if (member?.TeamId != null)
+                {
+                    team = await _db.Teams.FirstOrDefaultAsync(t => t.Id == member.TeamId);
+                }
+
+                if (team == null)
+                {
+                    team = await _db.Teams
+                        .Where(t => t.CreatedByEmail != null && t.CreatedByEmail.ToLower() == cleanEmail)
+                        .OrderByDescending(t => t.Id)
+                        .FirstOrDefaultAsync();
+                }
+            }
+
+            // Nếu user chưa vào nhóm nào: KHÔNG TỰ TẠO NHÓM MẪU! Trả về team = null
+            if (team == null)
+            {
+                return Ok(new
+                {
+                    success = true,
+                    team = (object?)null,
+                    members = Array.Empty<object>(),
+                    tasks = Array.Empty<object>(),
+                    schedules = new Dictionary<string, List<string>>(),
+                    meetings = Array.Empty<object>(),
+                    reviews = Array.Empty<object>(),
+                    emails = Array.Empty<object>(),
+                    activities = Array.Empty<object>()
+                });
+            }
+
+            // Lấy dữ liệu CHỈ THUỘC VỀ TEAM NÀY (Độc lập, không lẫn lộn với nhóm khác)
+            var members = await _db.Members
+                .Where(m => m.TeamId == team.Id)
+                .Include(m => m.ScheduleSlots)
+                .ToListAsync();
+
+            var tasks = await _db.Tasks
+                .Where(t => t.TeamId == team.Id)
+                .ToListAsync();
+
+            var meetings = await _db.Meetings
+                .Where(m => m.TeamId == team.Id)
+                .ToListAsync();
+
+            var activities = await _db.ActivityLogs
+                .Where(a => a.TeamId == team.Id)
+                .OrderByDescending(a => a.Id)
+                .Take(20)
+                .ToListAsync();
+
+            var memberIds = members.Select(m => m.Id).ToHashSet();
+            var taskIds = tasks.Select(t => t.Id).ToHashSet();
+
+            var reviews = await _db.PeerReviews
+                .Where(r => taskIds.Contains(r.TaskId) || memberIds.Contains(r.RevieweeId))
+                .ToListAsync();
+
+            var emails = await _db.EmailLogs
+                .Where(e => memberIds.Contains(e.ToEmail) || (cleanEmail != null && e.ToEmail.ToLower() == cleanEmail))
+                .OrderByDescending(e => e.Id)
+                .Take(25)
+                .ToListAsync();
 
             var schedules = new Dictionary<string, List<string>>();
             foreach (var m in members)
@@ -454,6 +607,7 @@ public class ApiController : ControllerBase
                 success = true,
                 team = new
                 {
+                    id = team.Id,
                     name = team.Name,
                     topic = team.Topic ?? "",
                     subject = team.Subject ?? "",
@@ -540,33 +694,77 @@ public class ApiController : ControllerBase
     }
 
     [HttpPost("save-state")]
-    public async Task<IActionResult> SaveFullState([FromBody] SyncStateDto dto)
+    public async Task<IActionResult> SaveFullState([FromBody] SyncStateDto dto, [FromQuery] string? userEmail = null)
     {
         try
         {
             if (dto == null) return BadRequest("Dữ liệu rỗng");
 
-            // Update Team
-            var team = await _db.Teams.FirstOrDefaultAsync();
-            if (team == null)
+            var cleanEmail = userEmail?.Trim().ToLowerInvariant() 
+                ?? dto.Team?.CreatedByEmail?.Trim().ToLowerInvariant();
+
+            Team? team = null;
+
+            if (!string.IsNullOrEmpty(dto.Team?.JoinCode))
             {
-                team = new Team();
-                _db.Teams.Add(team);
-            }
-            if (dto.Team != null)
-            {
-                team.Name = dto.Team.Name ?? "Nhóm của tôi";
-                team.Topic = dto.Team.Topic;
-                team.Subject = dto.Team.Subject;
-                team.ClassCode = dto.Team.ClassCode;
-                team.FinalDeadline = dto.Team.FinalDeadline;
-                if (!string.IsNullOrEmpty(dto.Team.JoinCode)) team.JoinCode = dto.Team.JoinCode;
-                if (!string.IsNullOrEmpty(dto.Team.CreatedByEmail)) team.CreatedByEmail = dto.Team.CreatedByEmail;
+                var cleanCode = dto.Team.JoinCode.Trim().ToUpperInvariant();
+                team = await _db.Teams.FirstOrDefaultAsync(t => t.JoinCode != null && t.JoinCode.ToUpper() == cleanCode);
             }
 
-            // Sync Members
-            var existingMembers = await _db.Members.Include(m => m.ScheduleSlots).ToListAsync();
-            _db.Members.RemoveRange(existingMembers);
+            if (team == null && !string.IsNullOrEmpty(cleanEmail))
+            {
+                var member = await _db.Members
+                    .Where(m => m.Email.ToLower() == cleanEmail && m.TeamId != null)
+                    .OrderByDescending(m => m.CreatedAt)
+                    .FirstOrDefaultAsync();
+
+                if (member?.TeamId != null)
+                {
+                    team = await _db.Teams.FirstOrDefaultAsync(t => t.Id == member.TeamId);
+                }
+
+                if (team == null)
+                {
+                    team = await _db.Teams
+                        .Where(t => t.CreatedByEmail != null && t.CreatedByEmail.ToLower() == cleanEmail)
+                        .OrderByDescending(t => t.Id)
+                        .FirstOrDefaultAsync();
+                }
+            }
+
+            if (team == null)
+            {
+                team = new Team
+                {
+                    Name = dto.Team?.Name ?? "Nhóm của tôi",
+                    Topic = dto.Team?.Topic,
+                    Subject = dto.Team?.Subject,
+                    ClassCode = dto.Team?.ClassCode,
+                    FinalDeadline = dto.Team?.FinalDeadline,
+                    JoinCode = !string.IsNullOrEmpty(dto.Team?.JoinCode) ? dto.Team.JoinCode : ("TF-" + Random.Shared.Next(1000, 9999)),
+                    CreatedByEmail = cleanEmail
+                };
+                _db.Teams.Add(team);
+                await _db.SaveChangesAsync();
+            }
+            else
+            {
+                if (dto.Team != null)
+                {
+                    if (!string.IsNullOrEmpty(dto.Team.Name)) team.Name = dto.Team.Name;
+                    team.Topic = dto.Team.Topic;
+                    team.Subject = dto.Team.Subject;
+                    team.ClassCode = dto.Team.ClassCode;
+                    team.FinalDeadline = dto.Team.FinalDeadline;
+                }
+            }
+
+            // CHỈ ĐỒNG BỘ THÀNH VIÊN THUỘC VỀ TEAM NÀY
+            var teamMembers = await _db.Members
+                .Where(m => m.TeamId == team.Id)
+                .Include(m => m.ScheduleSlots)
+                .ToListAsync();
+            _db.Members.RemoveRange(teamMembers);
 
             if (dto.Members != null)
             {
@@ -574,14 +772,16 @@ public class ApiController : ControllerBase
                 {
                     var newMember = new TeamMember
                     {
-                        Id = m.Id,
+                        Id = !string.IsNullOrEmpty(m.Id) ? m.Id : ("m_" + Guid.NewGuid().ToString("N")[..8]),
+                        TeamId = team.Id,
                         Name = m.Name,
                         Email = m.Email ?? "",
                         Role = m.Role ?? "Thành viên",
                         RoleType = !string.IsNullOrEmpty(m.RoleType) ? m.RoleType : ((m.Role != null && m.Role.Contains("trưởng", StringComparison.OrdinalIgnoreCase)) ? "Leader" : "Member"),
                         Password = !string.IsNullOrEmpty(m.Password) ? m.Password : "123456",
                         Avatar = m.Avatar ?? "TV",
-                        Color = m.Color ?? "#2563eb"
+                        Color = m.Color ?? "#2563eb",
+                        CreatedAt = DateTime.UtcNow
                     };
 
                     if (dto.Schedules != null && dto.Schedules.TryGetValue(m.Id, out var slots))
@@ -590,7 +790,7 @@ public class ApiController : ControllerBase
                         {
                             newMember.ScheduleSlots.Add(new ScheduleSlot
                             {
-                                MemberId = m.Id,
+                                MemberId = newMember.Id,
                                 SlotKey = s,
                                 IsAvailable = true
                             });
@@ -601,9 +801,9 @@ public class ApiController : ControllerBase
                 }
             }
 
-            // Sync Tasks
-            var existingTasks = await _db.Tasks.ToListAsync();
-            _db.Tasks.RemoveRange(existingTasks);
+            // CHỈ ĐỒNG BỘ TASKS THUỘC TEAM NÀY
+            var teamTasks = await _db.Tasks.Where(t => t.TeamId == team.Id).ToListAsync();
+            _db.Tasks.RemoveRange(teamTasks);
 
             if (dto.Tasks != null)
             {
@@ -611,7 +811,8 @@ public class ApiController : ControllerBase
                 {
                     _db.Tasks.Add(new TeamTask
                     {
-                        Id = t.Id,
+                        Id = !string.IsNullOrEmpty(t.Id) ? t.Id : ("task_" + Guid.NewGuid().ToString("N")[..8]),
+                        TeamId = team.Id,
                         Title = t.Title,
                         AssigneeId = t.AssigneeId,
                         Difficulty = t.Difficulty ?? "medium",
@@ -623,14 +824,15 @@ public class ApiController : ControllerBase
                         Description = t.Description,
                         ReminderTiming = t.ReminderTiming ?? "1_day",
                         ReminderCustomDateTime = t.ReminderCustomDateTime,
-                        ReminderSent = t.ReminderSent
+                        ReminderSent = t.ReminderSent,
+                        CreatedAt = DateTime.UtcNow
                     });
                 }
             }
 
-            // Sync Meetings
-            var existingMeetings = await _db.Meetings.ToListAsync();
-            _db.Meetings.RemoveRange(existingMeetings);
+            // CHỈ ĐỒNG BỘ MEETINGS THUỘC TEAM NÀY
+            var teamMeetings = await _db.Meetings.Where(m => m.TeamId == team.Id).ToListAsync();
+            _db.Meetings.RemoveRange(teamMeetings);
 
             if (dto.Meetings != null)
             {
@@ -638,84 +840,31 @@ public class ApiController : ControllerBase
                 {
                     _db.Meetings.Add(new TeamMeeting
                     {
-                        Id = mt.Id,
+                        Id = !string.IsNullOrEmpty(mt.Id) ? mt.Id : ("meet_" + Guid.NewGuid().ToString("N")[..8]),
+                        TeamId = team.Id,
                         Title = mt.Title,
                         MeetingDate = mt.Date ?? "",
                         Time = mt.Time ?? "",
-                        DurationMinutes = mt.Duration,
+                        DurationMinutes = mt.Duration > 0 ? mt.Duration : 60,
                         RoomCode = mt.RoomCode ?? "",
                         Platform = mt.Platform ?? "Phòng họp TeamFair ảo",
                         Link = mt.Link ?? "",
                         Notes = mt.Notes,
-                        Status = mt.Status ?? "scheduled"
-                    });
-                }
-            }
-
-            // Sync Reviews
-            var existingReviews = await _db.PeerReviews.ToListAsync();
-            _db.PeerReviews.RemoveRange(existingReviews);
-
-            if (dto.Reviews != null)
-            {
-                foreach (var r in dto.Reviews)
-                {
-                    _db.PeerReviews.Add(new PeerReview
-                    {
-                        Id = r.Id,
-                        TaskId = r.TaskId,
-                        RevieweeId = r.RevieweeId,
-                        ReviewerId = r.ReviewerId,
-                        Quality = r.Quality,
-                        Punctuality = r.Punctuality,
-                        Effort = r.Effort,
-                        Cooperation = r.Cooperation,
-                        Comment = r.Comment,
-                        CreatedAt = r.CreatedAt ?? ""
-                    });
-                }
-            }
-
-            // Sync Emails
-            var existingEmails = await _db.EmailLogs.ToListAsync();
-            _db.EmailLogs.RemoveRange(existingEmails);
-
-            if (dto.Emails != null)
-            {
-                foreach (var em in dto.Emails)
-                {
-                    _db.EmailLogs.Add(new EmailLog
-                    {
-                        Id = em.Id,
-                        ToEmail = em.To ?? "",
-                        ToName = em.ToName ?? "",
-                        Subject = em.Subject ?? "",
-                        Type = em.Type ?? "notification",
-                        Content = em.Content ?? "",
-                        SentAt = em.SentAt ?? ""
-                    });
-                }
-            }
-
-            // Sync Activities
-            var existingActivities = await _db.ActivityLogs.ToListAsync();
-            _db.ActivityLogs.RemoveRange(existingActivities);
-
-            if (dto.Activities != null)
-            {
-                foreach (var act in dto.Activities.Take(20))
-                {
-                    _db.ActivityLogs.Add(new ActivityLog
-                    {
-                        Time = act.Time ?? "",
-                        Text = act.Text ?? "",
-                        Type = act.Type ?? "general"
+                        Status = mt.Status ?? "scheduled",
+                        CreatedAt = DateTime.UtcNow
                     });
                 }
             }
 
             await _db.SaveChangesAsync();
-            return Ok(new { success = true, message = "Đã đồng bộ cơ sở dữ liệu Azure SQL thành công!" });
+
+            return Ok(new
+            {
+                success = true,
+                message = "Đã đồng bộ dữ liệu nhóm lên máy chủ thành công!",
+                teamId = team.Id,
+                joinCode = team.JoinCode
+            });
         }
         catch (Exception ex)
         {
@@ -730,7 +879,7 @@ public class ApiController : ControllerBase
         {
             if (string.IsNullOrWhiteSpace(dto.To))
             {
-                return BadRequest(new { success = false, message = "Email người nhận không được để trống." });
+                return BadRequest(new { success = false, message = "Email người nhận không hợp lệ." });
             }
 
             var cleanTo = dto.To.Trim();
@@ -748,7 +897,6 @@ public class ApiController : ControllerBase
             _db.EmailLogs.Add(newLog);
             await _db.SaveChangesAsync();
 
-            // Optional SMTP sending if configured in appsettings
             var smtpHost = _config["EmailSettings:SmtpHost"];
             var smtpPortStr = _config["EmailSettings:SmtpPort"];
             var smtpUser = _config["EmailSettings:SmtpUser"];
@@ -866,6 +1014,7 @@ public class JoinTeamDto
 
 public class TeamDto
 {
+    public int? Id { get; set; }
     public string? Name { get; set; }
     public string? Topic { get; set; }
     public string? Subject { get; set; }

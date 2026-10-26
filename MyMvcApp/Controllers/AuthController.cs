@@ -57,7 +57,6 @@ public class AuthController : Controller
 
             var cleanEmail = emailClaim.Trim().ToLowerInvariant();
 
-            // Tính toán avatar & màu sắc mặc định từ Google
             var words = nameClaim.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             var defaultAvatar = words.Length >= 2
                 ? (words[0][0].ToString() + words[^1][0].ToString()).ToUpper()
@@ -68,8 +67,8 @@ public class AuthController : Controller
 
             AppUser? user = null;
             bool isLeader = false;
+            Team? team = null;
 
-            // Cố gắng lưu/cập nhật tài khoản vào Azure SQL Database (nếu DB khả dụng)
             try
             {
                 user = await _db.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == cleanEmail);
@@ -89,9 +88,23 @@ public class AuthController : Controller
                     await _db.SaveChangesAsync();
                 }
 
-                // Kiểm tra phân quyền trưởng nhóm / thành viên
-                var team = await _db.Teams.FirstOrDefaultAsync();
-                var member = await _db.Members.FirstOrDefaultAsync(m => m.Email.ToLower() == cleanEmail);
+                var member = await _db.Members
+                    .Where(m => m.Email.ToLower() == cleanEmail && m.TeamId != null)
+                    .OrderByDescending(m => m.CreatedAt)
+                    .FirstOrDefaultAsync();
+
+                if (member?.TeamId != null)
+                {
+                    team = await _db.Teams.FirstOrDefaultAsync(t => t.Id == member.TeamId);
+                }
+                if (team == null)
+                {
+                    team = await _db.Teams
+                        .Where(t => t.CreatedByEmail != null && t.CreatedByEmail.ToLower() == cleanEmail)
+                        .OrderByDescending(t => t.Id)
+                        .FirstOrDefaultAsync();
+                }
+
                 if (team != null && !string.IsNullOrEmpty(team.CreatedByEmail) && team.CreatedByEmail.ToLower() == cleanEmail)
                 {
                     isLeader = true;
@@ -103,7 +116,7 @@ public class AuthController : Controller
             }
             catch (Exception dbEx)
             {
-                _logger.LogWarning(dbEx, "Không thể kết nối hoặc lưu dữ liệu vào Azure SQL Database, tiếp tục với tài khoản Google.");
+                _logger.LogWarning(dbEx, "Không thể kết nối hoặc lưu dữ liệu vào cơ sở dữ liệu, tiếp tục với tài khoản Google.");
             }
 
             var userPayload = new
@@ -114,10 +127,10 @@ public class AuthController : Controller
                 avatar = user?.Avatar ?? defaultAvatar,
                 color = user?.Color ?? defaultColor,
                 roleType = isLeader ? "Leader" : "Member",
-                role = isLeader ? "Trưởng nhóm" : "Thành viên"
+                role = isLeader ? "Trưởng nhóm" : "Thành viên",
+                joinCode = team?.JoinCode
             };
 
-            // Set cookie để frontend JavaScript đọc ngay lập tức khi redirect về trang chính
             Response.Cookies.Append("tf_google_user", System.Text.Json.JsonSerializer.Serialize(userPayload), new CookieOptions
             {
                 Expires = DateTimeOffset.UtcNow.AddDays(30),

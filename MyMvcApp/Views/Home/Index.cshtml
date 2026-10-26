@@ -3,17 +3,16 @@
 }
 
 <div class="container-fluid px-3 px-lg-4 py-3">
-    <!-- Top Bar / App Brand -->
-    <header class="d-flex flex-wrap align-items-center justify-content-between p-3 mb-3 bg-white rounded-4 shadow-sm border">
+    <!-- Top Bar / App Brand (Minimalist UX - Không xung đột nút bấm) -->
+    <header class="d-flex flex-wrap align-items-center justify-content-between p-3 mb-3 bg-white rounded-3 shadow-sm border">
         <div class="d-flex align-items-center gap-3">
-            
             <div>
                 <div class="d-flex align-items-center gap-2">
                     <h4 class="fw-bold text-slate-900 mb-0" style="letter-spacing: -0.5px;">TeamFair</h4>
-                    <span class="badge bg-primary-subtle text-primary fw-bold px-2 py-1" style="font-size: 0.75rem;">Nền tảng Quản Trị Nhóm</span>
+                    <span class="badge bg-primary-subtle text-primary fw-semibold px-2 py-1" style="font-size: 0.75rem;">Quản Lý & Nộp Bài Nhóm</span>
                 </div>
-                <div class="text-muted small mt-1" style="font-size: 0.825rem;">
-                    Quản lý tiến độ - Đánh giá công bằng - Tối ưu bài tập nhóm
+                <div class="text-muted small mt-1" style="font-size: 0.8rem;">
+                    Rõ việc • Đúng deadline • Nộp bài công bằng
                 </div>
             </div>
         </div>
@@ -28,15 +27,15 @@
 
             <!-- Join Code Badge -->
             <span id="topJoinCodeBadge" class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 cursor-pointer d-none" onclick="TeamFairApp.copyJoinCode()" title="Bấm để sao chép mã mời nhóm">
-                Mã nhóm: <strong id="topJoinCodeText">--</strong> [Sao chép]
+                Mã: <strong id="topJoinCodeText">--</strong> <span class="ms-1 text-decoration-underline">[Sao chép]</span>
             </span>
 
-            <!-- Azure SQL Live Badge -->
+            <!-- Database Status Indicator -->
             <span id="dbStatusBadge" class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" style="font-size: 0.75rem;">
-                Azure SQL: Đã kết nối
+                Đã kết nối
             </span>
 
-            <!-- User Profile & Account Dropdown -->
+            <!-- User Profile & Account Dropdown (Centralized Controls) -->
             <div class="dropdown" id="userAccountDropdown">
                 <button class="btn btn-sm btn-light border dropdown-toggle d-flex align-items-center gap-2 fw-semibold px-2 py-1" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="userRoleBtn">
                     <span id="userAvatarBadge" class="tf-avatar" style="width: 24px; height: 24px; font-size: 0.7rem; background-color: #2563eb;">TV</span>
@@ -44,70 +43,54 @@
                     <span id="userRoleTag" class="badge bg-primary" style="font-size: 0.7rem;">Thành Viên</span>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end shadow-sm border p-2" style="min-width: 260px;">
-                    <li class="p-2 border-bottom mb-2">
-                        <div class="small text-muted">Tài khoản đăng nhập:</div>
-                        <strong class="text-slate-900" id="ddUserName">Thành Viên</strong>
+                    <li class="p-2 border-bottom mb-2 bg-light rounded-2">
+                        <div class="small text-muted">Xin chào:</div>
+                        <strong class="text-slate-900 d-block text-truncate" id="ddUserName">Thành Viên</strong>
                         <div class="small text-muted text-truncate" id="ddUserEmail">email@student.edu.vn</div>
                         <div class="small mt-1" id="ddUserRole">Vai trò: <span class="badge bg-primary" id="ddRoleBadge">Thành Viên</span></div>
                     </li>
                     <li>
                         <a class="dropdown-item rounded-2 py-2 small d-flex align-items-center gap-2 text-success fw-semibold" href="javascript:void(0)" onclick="TeamFairApp.openCreateTeamModal()">
-                            
-                            <span>Tạo nhóm mới <em>(Làm Nhóm Trưởng)</em></span>
+                            <span>➕ Tạo nhóm mới <em>(Làm Nhóm Trưởng)</em></span>
                         </a>
                     </li>
                     <li>
                         <a class="dropdown-item rounded-2 py-2 small d-flex align-items-center gap-2 text-primary" href="javascript:void(0)" onclick="TeamFairApp.openJoinTeamModal()">
-                            
-                            <span>Tham gia nhóm khác <em>(Bằng Mã Mời)</em></span>
+                            <span>🔑 Tham gia nhóm khác <em>(Bằng Mã Mời)</em></span>
                         </a>
                     </li>
                     <li>
-                        <a class="dropdown-item rounded-2 py-2 small d-flex align-items-center gap-2 text-info fw-semibold" href="javascript:void(0)" onclick="TeamFairApp.loadDemoWorkspace()">
-                            
-                            <span>Nạp Dữ Liệu Mẫu <em>(Demo Workspace)</em></span>
+                        <a class="dropdown-item rounded-2 py-2 small d-flex align-items-center gap-2 text-info" href="javascript:void(0)" onclick="TeamFairApp.loadDemoWorkspace()">
+                            <span>⚡ Nạp dữ liệu mẫu <em>(Demo Workspace)</em></span>
                         </a>
                     </li>
                     <li>
                         <a class="dropdown-item rounded-2 py-2 small d-flex align-items-center gap-2 text-secondary" href="javascript:void(0)" onclick="TeamFairApp.openOnboardingGuide()">
-                            
-                            <span>Hướng dẫn quy trình 4 bước</span>
+                            <span>📖 Xem hướng dẫn quy trình</span>
                         </a>
                     </li>
                     <li><hr class="dropdown-divider"></li>
                     <li>
-                        <a class="dropdown-item rounded-2 py-2 small d-flex align-items-center gap-2 text-danger" href="javascript:void(0)" onclick="TeamFairApp.logout()">
-                            
-                            <span>Đăng xuất tài khoản</span>
+                        <a class="dropdown-item rounded-2 py-2 small d-flex align-items-center gap-2 text-warning" href="javascript:void(0)" onclick="TeamFairApp.clearAllData()">
+                            <span>🧹 Dọn sạch dữ liệu nhóm</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item rounded-2 py-2 small d-flex align-items-center gap-2 text-danger fw-semibold" href="javascript:void(0)" onclick="TeamFairApp.logout()">
+                            <span>🚪 Đăng xuất tài khoản</span>
                         </a>
                     </li>
                 </ul>
             </div>
-
-            <!-- Onboarding Guide Button -->
-            <button class="btn btn-sm btn-outline-secondary fw-semibold d-flex align-items-center gap-1" onclick="TeamFairApp.openOnboardingGuide()" title="Xem hướng dẫn quy trình 4 bước làm việc nhóm">
-                
-                <span class="d-none d-md-inline">Hướng Dẫn</span>
-            </button>
-
-            <!-- Direct Logout Button (Always Visible when logged in) -->
-            <button class="btn btn-sm btn-outline-danger fw-semibold d-flex align-items-center gap-1" id="btnHeaderDirectLogout" onclick="TeamFairApp.logout()" title="Đăng xuất khỏi hệ thống">
-                
-                <span>Đăng Xuất</span>
-            </button>
 
             <!-- Login / Register button when not logged in -->
             <button class="btn btn-sm btn-primary d-none fw-semibold" id="btnHeaderLogin" onclick="TeamFairApp.showAuthPortal()">
                 Đăng Nhập / Đăng Ký
             </button>
 
-            <button class="btn btn-sm btn-outline-danger" onclick="TeamFairApp.clearAllData()" title="Xóa toàn bộ dữ liệu database để bắt đầu sạch sẽ">
-                Xóa làm mới
-            </button>
-            <button class="btn btn-sm btn-tf-primary text-white fw-bold d-flex align-items-center gap-1 shadow-sm px-3" id="btnHeaderReport" onclick="TeamFairApp.switchTab('report')" title="Báo cáo phân chia công việc & mức độ đóng góp (Primary Action)">
-                
-                <span>Báo Cáo Nộp Bài</span>
-            </button>
+            <!-- Hidden elements for backward compatibility with JS selectors -->
+            <span id="btnHeaderDirectLogout" class="d-none"></span>
+            <span id="btnHeaderReport" class="d-none"></span>
         </div>
     </header>
 
@@ -378,26 +361,23 @@
                 </div>
             </div>
 
-            <!-- Role Indicator Banner (Active Team) -->
-            <div class="alert d-flex flex-wrap align-items-center justify-content-between p-3 mb-4 rounded-3 shadow-sm" id="roleBanner" style="background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%); border: 1px solid #bbf7d0;">
+            <!-- Role Indicator Banner (Minimalist UX - Màu trung tính dịu mắt) -->
+            <div class="p-3 mb-4 rounded-3 shadow-sm border bg-white d-flex flex-wrap align-items-center justify-content-between" id="roleBanner" style="border-left: 4px solid #2563eb !important;">
                 <div class="d-flex align-items-center gap-3">
-                    <span class="fs-3" id="roleBannerIcon"></span>
+                    <span class="fs-4" id="roleBannerIcon">🎓</span>
                     <div>
-                        <h6 class="fw-bold text-slate-900 mb-0" id="roleBannerTitle">Bảng Điều Khiển Quản Trị - Nhóm Trưởng</h6>
+                        <h6 class="fw-bold text-slate-900 mb-0" id="roleBannerTitle">Bảng Điều Khiển Sinh Viên</h6>
                         <div class="small text-slate-600 mt-1" id="roleBannerDesc">
-                            Bạn đang có quyền quản trị toàn diện: theo dõi chỉ số công bằng nhóm, giao việc, duyệt tiến độ và nhắc nhở thành viên.
+                            Tập trung vào công việc chính: Nhìn rõ Task ➔ Biết Deadline ➔ Nộp bài đúng hạn.
                         </div>
                     </div>
                 </div>
                 <div class="mt-2 mt-md-0 d-flex gap-2 align-items-center">
-                    <span id="bannerJoinCodeDisplay" class="badge bg-white text-primary border shadow-sm px-3 py-2 small fw-semibold">
-                        Mã mời nhóm: <strong id="bannerJoinCodeText">TF-xxxx</strong>
+                    <span id="bannerJoinCodeDisplay" class="badge bg-light text-slate-700 border px-3 py-2 small fw-semibold d-none">
+                        Mã nhóm: <strong id="bannerJoinCodeText">TF-xxxx</strong>
                     </span>
-                    <button class="btn btn-sm btn-outline-success fw-semibold" onclick="TeamFairApp.openCreateTeamModal()">
-                        Tạo nhóm khác
-                    </button>
                     <button class="btn btn-sm btn-outline-primary fw-semibold" id="btnSwitchOtherRole" onclick="TeamFairApp.toggleCurrentRole()">
-                        Xem giao diện Thành Viên
+                        Đổi góc nhìn (Trưởng Nhóm / Thành Viên)
                     </button>
                 </div>
             </div>
@@ -1463,6 +1443,42 @@
                     Nạp Dữ Liệu Mẫu (Demo Workspace)
                 </button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đã Hiểu, Bắt Đầu Làm Việc</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== MODAL: NỘP BÀI TẬP & MINH CHỨNG (MINIMALIST UX) ==================== -->
+<div class="modal fade" id="modalSubmitTask" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0 rounded-4">
+            <div class="modal-header border-bottom p-3 bg-white">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-4">🚀</span>
+                    <div>
+                        <h6 class="modal-title fw-bold text-slate-900 mb-0">Nộp Bài & Báo Cáo Tiến Độ</h6>
+                        <div class="small text-muted" id="submitTaskTitle">Tiêu đề công việc</div>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold text-slate-700">Link minh chứng kết quả (GitHub / Google Drive / Figma / Docs):</label>
+                    <input type="url" id="submitTaskLink" class="form-control" placeholder="https://github.com/... hoặc https://drive.google.com/..." />
+                    <div class="form-text small text-muted">Dán link chứa mã nguồn, file báo cáo hoặc tài liệu bạn đã hoàn thành.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold text-slate-700">Ghi chú bàn giao kết quả (tùy chọn):</label>
+                    <textarea id="submitTaskNote" class="form-control" rows="3" placeholder="Mô tả tóm tắt nội dung bạn đã làm, lưu ý khi kiểm tra bài..."></textarea>
+                </div>
+                <div class="p-3 bg-success-subtle rounded-3 text-success small border border-success-subtle mb-0">
+                    ✓ Sau khi xác nhận, công việc sẽ được đánh dấu <strong>100% Hoàn thành</strong> và cập nhật ngay vào tiến độ chung của nhóm.
+                </div>
+            </div>
+            <div class="modal-footer border-top p-3 bg-light">
+                <button type="button" class="btn btn-outline-secondary btn-sm fw-semibold" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-primary btn-sm fw-bold px-4" onclick="TeamFairApp.confirmSubmitTask()">Xác Nhận Nộp Bài</button>
             </div>
         </div>
     </div>
