@@ -957,6 +957,19 @@ body.tf-app-body {
 .tf-meeting-btn.btn-danger-room { background: var(--tf-red); }
 .tf-meeting-btn.btn-danger-room:hover { background: var(--tf-red-hover); }
 .tf-meeting-btn.active-control { background: var(--tf-teal); }
+.tf-video-box video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000;
+}
+.tf-video-box video.tf-mirror { transform: scaleX(-1); }
+.tf-video-box .tf-video-placeholder { position: relative; z-index: 1; }
+.tf-video-box.cam-off video { visibility: hidden; }
+.tf-video-box:not(.cam-off) .tf-video-placeholder { display: none; }
+.tf-video-box .tf-video-name, .tf-video-box .tf-video-status { z-index: 2; }
 
 /* Star Rating Widget */
 .star-rating {

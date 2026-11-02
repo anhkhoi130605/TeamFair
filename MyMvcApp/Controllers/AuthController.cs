@@ -105,9 +105,10 @@ public class AuthController : Controller
                         .FirstOrDefaultAsync();
                 }
 
-                if (team != null && !string.IsNullOrEmpty(team.CreatedByEmail) && team.CreatedByEmail.ToLower() == cleanEmail)
+                // Mỗi nhóm chỉ có 1 Nhóm Trưởng là người tạo nhóm
+                if (team != null && !string.IsNullOrEmpty(team.CreatedByEmail))
                 {
-                    isLeader = true;
+                    isLeader = team.CreatedByEmail.ToLower() == cleanEmail;
                 }
                 else if (member != null && string.Equals(member.RoleType, "Leader", StringComparison.OrdinalIgnoreCase))
                 {

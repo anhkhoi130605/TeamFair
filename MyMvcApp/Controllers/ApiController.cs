@@ -38,6 +38,17 @@ public class ApiController : ControllerBase
         }
     }
 
+    // Mỗi nhóm chỉ có đúng 1 Nhóm Trưởng là người tạo nhóm (CreatedByEmail).
+    // Chỉ dùng RoleType lưu sẵn cho các nhóm cũ chưa ghi nhận người tạo.
+    private static bool IsLeaderOf(Team team, string? email, string? fallbackRoleType)
+    {
+        if (!string.IsNullOrEmpty(team.CreatedByEmail))
+        {
+            return !string.IsNullOrWhiteSpace(email) && string.Equals(team.CreatedByEmail.Trim(), email.Trim(), StringComparison.OrdinalIgnoreCase);
+        }
+        return string.Equals(fallbackRoleType, "Leader", StringComparison.OrdinalIgnoreCase);
+    }
+
     [HttpPost("apply-migration")]
     public async Task<IActionResult> ApplyMigration()
     {
@@ -189,15 +200,7 @@ public class ApiController : ControllerBase
                     .FirstOrDefaultAsync();
             }
 
-            bool isLeader = false;
-            if (team != null && !string.IsNullOrEmpty(team.CreatedByEmail) && team.CreatedByEmail.ToLower() == cleanEmail)
-            {
-                isLeader = true;
-            }
-            else if (member != null && string.Equals(member.RoleType, "Leader", StringComparison.OrdinalIgnoreCase))
-            {
-                isLeader = true;
-            }
+            bool isLeader = team != null && IsLeaderOf(team, cleanEmail, member?.RoleType);
 
             return Ok(new
             {
@@ -285,15 +288,7 @@ public class ApiController : ControllerBase
                     .FirstOrDefaultAsync();
             }
 
-            bool isLeader = false;
-            if (team != null && !string.IsNullOrEmpty(team.CreatedByEmail) && team.CreatedByEmail.ToLower() == cleanEmail)
-            {
-                isLeader = true;
-            }
-            else if (member != null && string.Equals(member.RoleType, "Leader", StringComparison.OrdinalIgnoreCase))
-            {
-                isLeader = true;
-            }
+            bool isLeader = team != null && IsLeaderOf(team, cleanEmail, member?.RoleType);
 
             return Ok(new
             {
@@ -616,15 +611,19 @@ public class ApiController : ControllerBase
                     joinCode = team.JoinCode ?? "",
                     createdByEmail = team.CreatedByEmail ?? ""
                 },
-                members = members.Select(m => new
+                members = members.Select(m =>
                 {
-                    id = m.Id,
-                    name = m.Name,
-                    email = m.Email,
-                    role = m.Role,
-                    roleType = string.Equals(m.RoleType, "Leader", StringComparison.OrdinalIgnoreCase) || (m.Role != null && m.Role.Contains("trưởng", StringComparison.OrdinalIgnoreCase)) ? "Leader" : "Member",
-                    avatar = m.Avatar,
-                    color = m.Color
+                    var isLeader = IsLeaderOf(team, m.Email, string.Equals(m.RoleType, "Leader", StringComparison.OrdinalIgnoreCase) || (m.Role != null && m.Role.Contains("trưởng", StringComparison.OrdinalIgnoreCase)) ? "Leader" : "Member");
+                    return new
+                    {
+                        id = m.Id,
+                        name = m.Name,
+                        email = m.Email,
+                        role = !isLeader && m.Role != null && m.Role.Contains("trưởng", StringComparison.OrdinalIgnoreCase) ? "Thành viên" : m.Role,
+                        roleType = isLeader ? "Leader" : "Member",
+                        avatar = m.Avatar,
+                        color = m.Color
+                    };
                 }),
                 tasks = tasks.Select(t => new
                 {
@@ -760,24 +759,35 @@ public class ApiController : ControllerBase
             }
 
             // CHỈ ĐỒNG BỘ THÀNH VIÊN THUỘC VỀ TEAM NÀY
+            // Chỉ thay thế thành viên có trong payload hoặc bị xóa rõ ràng; giữ lại người mới tham gia bằng mã
+            // mà client (state cũ) chưa biết, tránh việc lưu state làm mất thành viên.
+            var dtoMemberIds = (dto.Members ?? new List<MemberDto>()).Where(m => !string.IsNullOrEmpty(m.Id)).Select(m => m.Id).ToHashSet();
+            var removedIds = (dto.RemovedMemberIds ?? new List<string>()).ToHashSet();
             var teamMembers = await _db.Members
                 .Where(m => m.TeamId == team.Id)
                 .Include(m => m.ScheduleSlots)
                 .ToListAsync();
-            _db.Members.RemoveRange(teamMembers);
+            _db.Members.RemoveRange(teamMembers.Where(m => dtoMemberIds.Contains(m.Id) || removedIds.Contains(m.Id)));
 
             if (dto.Members != null)
             {
                 foreach (var m in dto.Members)
                 {
+                    if (!string.IsNullOrEmpty(m.Id) && removedIds.Contains(m.Id)) continue;
+
+                    // Mỗi nhóm chỉ có 1 Nhóm Trưởng: người tạo nhóm
+                    var isLeader = IsLeaderOf(team, m.Email, !string.IsNullOrEmpty(m.RoleType) ? m.RoleType : ((m.Role != null && m.Role.Contains("trưởng", StringComparison.OrdinalIgnoreCase)) ? "Leader" : "Member"));
+                    var role = m.Role ?? "Thành viên";
+                    if (!isLeader && role.Contains("trưởng", StringComparison.OrdinalIgnoreCase)) role = "Thành viên";
+
                     var newMember = new TeamMember
                     {
                         Id = !string.IsNullOrEmpty(m.Id) ? m.Id : ("m_" + Guid.NewGuid().ToString("N")[..8]),
                         TeamId = team.Id,
                         Name = m.Name,
                         Email = m.Email ?? "",
-                        Role = m.Role ?? "Thành viên",
-                        RoleType = !string.IsNullOrEmpty(m.RoleType) ? m.RoleType : ((m.Role != null && m.Role.Contains("trưởng", StringComparison.OrdinalIgnoreCase)) ? "Leader" : "Member"),
+                        Role = role,
+                        RoleType = isLeader ? "Leader" : "Member",
                         Password = !string.IsNullOrEmpty(m.Password) ? m.Password : "123456",
                         Avatar = m.Avatar ?? "TV",
                         Color = m.Color ?? "#2563eb",
@@ -971,6 +981,7 @@ public class SyncStateDto
     public List<ReviewDto>? Reviews { get; set; }
     public List<EmailDto>? Emails { get; set; }
     public List<ActivityDto>? Activities { get; set; }
+    public List<string>? RemovedMemberIds { get; set; }
 }
 
 public class RegisterDto

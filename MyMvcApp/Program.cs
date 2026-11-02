@@ -8,6 +8,7 @@ builder.Configuration.AddJsonFile("appsettings.local.json", optional: true, relo
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+builder.Services.AddSignalR();
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -82,5 +83,8 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}")
     .WithStaticAssets();
+
+// Kênh tín hiệu realtime cho phòng họp ảo (WebRTC)
+app.MapHub<MyMvcApp.Hubs.MeetingHub>("/hubs/meeting");
 
 app.Run();

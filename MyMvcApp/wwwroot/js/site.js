@@ -201,6 +201,11 @@ const TeamFairApp = {
         if (myMember.name && (!this.currentUser.name || this.currentUser.name === "Thành Viên" || this.currentUser.name === "Trưởng Nhóm")) {
           this.currentUser.name = myMember.name;
         }
+      } else if (this.state?.team?.createdByEmail) {
+        // Không tìm thấy bản ghi thành viên: vai trò dựa theo người tạo nhóm
+        const isCreator = this.isRealLeader();
+        this.currentUser.roleType = isCreator ? "Leader" : "Member";
+        this.currentUser.role = isCreator ? "Trưởng nhóm" : "Thành viên";
       }
       this.saveUserSession();
     }
@@ -213,6 +218,16 @@ const TeamFairApp = {
     }
   },
 
+  // Vai trò thật trong nhóm (không phụ thuộc góc nhìn đang chọn): mỗi nhóm chỉ có 1 Nhóm Trưởng là người tạo nhóm
+  isRealLeader() {
+    if (!this.currentUser) return false;
+    const creator = this.state?.team?.createdByEmail;
+    if (creator) {
+      return !!this.currentUser.email && creator.toLowerCase() === this.currentUser.email.toLowerCase();
+    }
+    return this.getCurrentMember()?.roleType === "Leader";
+  },
+
   saveState() {
     try {
       const userKey = this.currentUser?.email ? `TeamFair_State_${this.currentUser.email}` : "TeamFair_State_v3";
@@ -222,14 +237,16 @@ const TeamFairApp = {
     }
 
     const emailParam = this.currentUser?.email ? encodeURIComponent(this.currentUser.email) : "";
+    const removedMemberIds = [...(this.pendingRemovedMemberIds || [])];
     fetch(`/api/save-state?userEmail=${emailParam}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(this.state)
+      body: JSON.stringify({ ...this.state, removedMemberIds })
     })
       .then(r => r.json())
       .then(data => {
         if (data && data.success) {
+          this.pendingRemovedMemberIds = (this.pendingRemovedMemberIds || []).filter(id => !removedMemberIds.includes(id));
           this.updateDbStatus(true);
         }
       })
@@ -677,6 +694,10 @@ const TeamFairApp = {
   },
 
   toggleCurrentRole() {
+    if (!this.isRealLeader()) {
+      this.showToast("Chỉ Nhóm Trưởng mới có thể đổi góc nhìn.", "warning");
+      return;
+    }
     if (this.currentUser.roleType === "Leader") {
       this.currentUser.roleType = "Member";
       this.showToast("Đang xem dưới góc nhìn Thành Viên.", "info");
@@ -1066,7 +1087,8 @@ const TeamFairApp = {
     const isLeader = this.currentUser?.roleType === "Leader";
 
     if (this.activeTab === "dashboard") {
-      container.innerHTML = `
+      // Chỉ Nhóm Trưởng thật mới được xem thử góc nhìn Thành Viên; thành viên không thể tự nâng quyền
+      container.innerHTML = !this.isRealLeader() ? '' : `
         <div class="tf-role-segmented" title="Đổi góc nhìn hiển thị">
           <button class="tf-role-segment-btn ${isLeader ? 'active' : ''}" onclick="TeamFairApp.setRoleType('Leader')">Nhóm Trưởng</button>
           <button class="tf-role-segment-btn ${!isLeader ? 'active' : ''}" onclick="TeamFairApp.setRoleType('Member')">Thành Viên</button>
@@ -1118,6 +1140,10 @@ const TeamFairApp = {
   },
 
   setRoleType(role) {
+    if (role === "Leader" && !this.isRealLeader()) {
+      this.showToast("Mỗi nhóm chỉ có 1 Nhóm Trưởng là người tạo nhóm.", "warning");
+      return;
+    }
     if (this.currentUser) {
       this.currentUser.roleType = role;
       this.saveUserSession();
@@ -1285,7 +1311,15 @@ const TeamFairApp = {
     this.renderReviews();
   },
 
-  openAddTaskDrawer() {
+  async refreshMembersFromServer() {
+    // Tải lại danh sách để thấy thành viên vừa tham gia bằng mã nhóm
+    if (!this.state?.team) return;
+    await this.loadState();
+    this.renderAll();
+  },
+
+  async openAddTaskDrawer() {
+    await this.refreshMembersFromServer();
     const el = document.getElementById("offcanvasAddTask");
     if (el) {
       const oc = bootstrap.Offcanvas.getOrCreateInstance(el);
@@ -1293,7 +1327,8 @@ const TeamFairApp = {
     }
   },
 
-  openMembersDrawer() {
+  async openMembersDrawer() {
+    await this.refreshMembersFromServer();
     const el = document.getElementById("offcanvasMembers");
     if (el) {
       const oc = bootstrap.Offcanvas.getOrCreateInstance(el);
@@ -2304,8 +2339,13 @@ const TeamFairApp = {
     }
     const m = this.state.members.find(x => x.id === id);
     if (confirm(`Bạn có chắc muốn xóa thành viên ${m?.name} khỏi nhóm không?`)) {
+      if (m?.roleType === "Leader") {
+        alert("Không thể xóa Nhóm Trưởng khỏi nhóm!");
+        return;
+      }
       this.state.members = this.state.members.filter(x => x.id !== id);
       delete this.state.schedules[id];
+      this.pendingRemovedMemberIds = [...(this.pendingRemovedMemberIds || []), id];
       this.saveState();
       this.renderAll();
       this.showToast("Đã xóa thành viên khỏi nhóm.", "info");
