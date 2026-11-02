@@ -2646,14 +2646,47 @@ const TeamFairApp = {
     document.getElementById("meetingNotes").value = "";
   },
 
-  enterVirtualMeeting(meetingId) {
-    const meeting = this.state.meetings.find(m => m.id === meetingId) || { title: "Phòng Họp Trực Tuyến TeamFair" };
-    const roomModal = new bootstrap.Modal(document.getElementById("virtualMeetingModal"));
-    roomModal.show();
+  /* ---------- Phòng họp thật: WebRTC (mesh) + SignalR làm kênh tín hiệu ---------- */
+  meetingEscape(text) {
+    const div = document.createElement("div");
+    div.textContent = text == null ? "" : String(text);
+    return div.innerHTML;
+  },
+
+  async enterVirtualMeeting(meetingId) {
+    if (this.inMeeting) await this.leaveMeeting(true);
+
+    if (!window.signalR || !window.RTCPeerConnection) {
+      alert("Trình duyệt không hỗ trợ phòng họp trực tuyến (thiếu WebRTC hoặc SignalR). Vui lòng dùng Chrome/Edge/Firefox bản mới.");
+      return;
+    }
+
+    const meeting = this.state.meetings.find(m => m.id === meetingId);
+    // Mọi người cùng nhóm vào chung 1 phòng: phòng tức thì theo mã nhóm, hoặc phòng riêng của từng cuộc họp đã lên lịch
+    const teamCode = (this.state.team?.joinCode || "TEAMFAIR").toUpperCase();
+    this.meetingRoomId = meeting?.roomCode ? `${teamCode}-${meeting.roomCode}` : `${teamCode}-LIVE`;
+
+    const modalEl = document.getElementById("virtualMeetingModal");
+    if (!this._meetingModalBound) {
+      modalEl.addEventListener("hidden.bs.modal", () => { if (this.inMeeting) this.leaveMeeting(true); });
+      this._meetingModalBound = true;
+    }
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+
+    const titleEl = document.getElementById("meetingModalTitle");
+    if (titleEl) titleEl.textContent = meeting?.title || "Phòng Họp Trực Tuyến TeamFair";
+    const codeEl = document.getElementById("meetingRoomCodeText");
+    if (codeEl) codeEl.textContent = this.meetingRoomId;
+    const chatBox = document.getElementById("meetingChatMessages");
+    if (chatBox) chatBox.innerHTML = "";
+    this.appendMeetingChat("TeamFair Bot", "Đang mở camera & micro...", true);
 
     this.inMeeting = true;
+    this.meetingPeers = new Map();
+    this.screenSharing = false;
     this.meetingSeconds = 0;
     const timerEl = document.getElementById("meetingTimerText");
+    if (timerEl) timerEl.textContent = "00:00";
     if (this.meetingTimer) clearInterval(this.meetingTimer);
     this.meetingTimer = setInterval(() => {
       this.meetingSeconds++;
@@ -2662,90 +2695,405 @@ const TeamFairApp = {
       if (timerEl) timerEl.textContent = `${mins}:${secs}`;
     }, 1000);
 
-    const videoGrid = document.getElementById("meetingVideoGrid");
-    if (videoGrid) {
-      if (!this.state.members.length) {
-        videoGrid.innerHTML = `
-          <div class="tf-video-box active-speaker" style="grid-column: 1 / -1;">
-            <div class="text-center text-white p-4">
-              
-              <div class="fw-bold">${this.currentUser.name} (Đang trực tuyến)</div>
-              <div class="text-muted small mt-1">Phòng họp ảo đang sẵn sàng.</div>
-            </div>
-            <div class="tf-video-name">${this.currentUser.name}</div>
-          </div>
-        `;
-      } else {
-        videoGrid.innerHTML = this.state.members.map((m, idx) => `
-          <div class="tf-video-box ${idx === 0 ? 'active-speaker' : ''}" id="vbox-${m.id}">
-            <div class="text-center text-white">
-              <span class="tf-avatar mb-2" style="background-color: ${m.color}; width: 64px; height: 64px; font-size: 1.5rem;">
-                ${m.avatar}
-              </span>
-              <div class="fw-bold" style="font-size: 0.9rem;">${m.name}</div>
-              <div class="text-muted small">${m.role}</div>
-            </div>
-            <div class="tf-video-status">
-              <span class="badge bg-dark bg-opacity-75">ON</span>
-            </div>
-            <div class="tf-video-name">${m.name}</div>
-          </div>
-        `).join("");
+    const grid = document.getElementById("meetingVideoGrid");
+    if (grid) grid.innerHTML = "";
+
+    await this.startLocalMedia();
+    if (!this.inMeeting) return; // đã rời phòng trong lúc chờ quyền camera
+
+    this.renderMeetingTile("local", {
+      name: `${this.currentUser?.name || "Bạn"} (Bạn)`,
+      avatar: this.currentUser?.avatar || "TV",
+      color: this.currentUser?.color || "#3CC8C8",
+      mic: this.micOn,
+      cam: this.cameraOn
+    }, true);
+    this.attachMeetingStream("local", new MediaStream([this.getOutgoingVideoTrack()]));
+    this.updateMeetingControls();
+
+    await this.connectMeetingHub();
+  },
+
+  async startLocalMedia() {
+    this.audioTrack = null;
+    this.cameraTrack = null;
+    const md = navigator.mediaDevices;
+    if (!md || !md.getUserMedia) {
+      this.showToast("Không truy cập được camera/micro: trang cần chạy trên HTTPS hoặc localhost.", "warning");
+    } else {
+      // Thử lần lượt: cả hai -> chỉ micro -> chỉ camera
+      const attempts = [{ video: true, audio: true }, { audio: true }, { video: true }];
+      for (const constraints of attempts) {
+        try {
+          const stream = await md.getUserMedia(constraints);
+          this.audioTrack = stream.getAudioTracks()[0] || null;
+          this.cameraTrack = stream.getVideoTracks()[0] || null;
+          break;
+        } catch (e) {
+          console.warn("getUserMedia thất bại:", constraints, e);
+        }
+      }
+      if (!this.audioTrack && !this.cameraTrack) {
+        this.showToast("Bạn chưa cấp quyền camera/micro. Vẫn có thể xem, nghe và chat trong phòng.", "warning");
       }
     }
 
-    const meetingTitleEl = document.getElementById("meetingModalTitle");
-    if (meetingTitleEl) meetingTitleEl.textContent = meeting.title;
+    // Luôn có 1 track video gửi đi (khung đen nếu không có camera) để vẫn chia sẻ màn hình được mà không cần đàm phán lại
+    if (!this.blankVideoTrack || this.blankVideoTrack.readyState === "ended") {
+      const canvas = document.createElement("canvas");
+      canvas.width = 640;
+      canvas.height = 360;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      this.blankVideoTrack = canvas.captureStream(1).getVideoTracks()[0];
+    }
+
+    this.micOn = !!this.audioTrack;
+    this.cameraOn = !!this.cameraTrack;
+  },
+
+  getOutgoingVideoTrack() {
+    return this.screenTrack || this.cameraTrack || this.blankVideoTrack;
+  },
+
+  async connectMeetingHub() {
+    const conn = new signalR.HubConnectionBuilder()
+      .withUrl("/hubs/meeting")
+      .withAutomaticReconnect()
+      .build();
+    this.meetingConn = conn;
+
+    conn.on("PeerJoined", info => {
+      this.createMeetingPeer(info.connectionId, info);
+      this.appendMeetingChat("TeamFair Bot", `${info.name} đã vào phòng.`, true);
+    });
+    conn.on("PeerLeft", connId => {
+      const peer = this.meetingPeers.get(connId);
+      if (peer) this.appendMeetingChat("TeamFair Bot", `${peer.info.name} đã rời phòng.`, true);
+      this.removeMeetingPeer(connId);
+    });
+    conn.on("PeerState", (connId, mic, cam) => {
+      const peer = this.meetingPeers.get(connId);
+      if (!peer) return;
+      peer.info.mic = mic;
+      peer.info.cam = cam;
+      this.updateMeetingTileState(connId, mic, cam);
+    });
+    conn.on("Signal", (fromId, payload) => this.handleMeetingSignal(fromId, payload));
+    conn.on("ChatMessage", (name, text) => this.appendMeetingChat(name, text));
+
+    conn.onreconnecting(() => this.setMeetingStatus("● Mất kết nối, đang thử lại...", "text-warning"));
+    conn.onreconnected(() => {
+      // ConnectionId mới: vào lại phòng và kết nối lại với mọi người
+      this.meetingPeers.forEach((_, id) => this.removeMeetingPeer(id));
+      this.joinMeetingRoom();
+    });
+    conn.onclose(() => { if (this.inMeeting) this.setMeetingStatus("● Đã ngắt kết nối", "text-danger"); });
+
+    try {
+      await conn.start();
+    } catch (err) {
+      console.error("Không kết nối được máy chủ phòng họp:", err);
+      this.setMeetingStatus("● Không kết nối được máy chủ", "text-danger");
+      this.appendMeetingChat("TeamFair Bot", "Không kết nối được máy chủ phòng họp. Vui lòng thử lại.", true);
+      return;
+    }
+    if (!this.inMeeting) { conn.stop(); return; }
+    await this.joinMeetingRoom();
+  },
+
+  async joinMeetingRoom() {
+    try {
+      const others = await this.meetingConn.invoke("JoinRoom", this.meetingRoomId,
+        this.currentUser?.name || "Thành viên", this.currentUser?.avatar || "TV", this.currentUser?.color || "#2563eb",
+        this.micOn, this.cameraOn || this.screenSharing);
+      this.setMeetingStatus("● Đang trực tuyến", "text-success");
+      this.appendMeetingChat("TeamFair Bot", others.length
+        ? `Đã vào phòng. Đang kết nối với ${others.length} người...`
+        : "Đã vào phòng. Chờ thành viên khác vào cùng mã phòng.", true);
+      // Người mới vào chủ động gửi offer cho những người đã có mặt
+      for (const info of others) {
+        const peer = this.createMeetingPeer(info.connectionId, info);
+        const offer = await peer.pc.createOffer();
+        await peer.pc.setLocalDescription(offer);
+        this.sendMeetingSignal(info.connectionId, { type: "offer", sdp: peer.pc.localDescription });
+      }
+    } catch (err) {
+      console.error("Lỗi vào phòng họp:", err);
+      this.setMeetingStatus("● Lỗi vào phòng", "text-danger");
+    }
+  },
+
+  createMeetingPeer(connId, info) {
+    const existing = this.meetingPeers.get(connId);
+    if (existing) return existing;
+
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }]
+    });
+    const peer = { pc, info, pendingCandidates: [] };
+    this.meetingPeers.set(connId, peer);
+
+    const outStream = new MediaStream();
+    if (this.audioTrack) pc.addTrack(this.audioTrack, outStream);
+    pc.addTrack(this.getOutgoingVideoTrack(), outStream);
+
+    pc.onicecandidate = e => {
+      if (e.candidate) this.sendMeetingSignal(connId, { type: "candidate", candidate: e.candidate });
+    };
+    pc.ontrack = e => {
+      const stream = e.streams[0] || new MediaStream([e.track]);
+      this.attachMeetingStream(connId, stream);
+    };
+    pc.onconnectionstatechange = () => {
+      const tile = document.getElementById(`vbox-${connId}`);
+      const badge = tile?.querySelector(".tf-conn-badge");
+      if (!badge) return;
+      const st = pc.connectionState;
+      badge.textContent = st === "connected" ? "" : (st === "failed" ? "Lỗi kết nối" : "Đang kết nối...");
+      badge.classList.toggle("d-none", st === "connected");
+    };
+
+    this.renderMeetingTile(connId, info, false);
+    this.updateMeetingPeopleCount();
+    return peer;
+  },
+
+  async handleMeetingSignal(fromId, payload) {
+    let msg;
+    try { msg = JSON.parse(payload); } catch { return; }
+    let peer = this.meetingPeers.get(fromId);
+    if (!peer) {
+      if (msg.type !== "offer") return;
+      peer = this.createMeetingPeer(fromId, { connectionId: fromId, name: "Thành viên", avatar: "TV", color: "#2563eb", mic: true, cam: true });
+    }
+    const pc = peer.pc;
+    try {
+      if (msg.type === "offer") {
+        await pc.setRemoteDescription(msg.sdp);
+        await this.flushMeetingCandidates(peer);
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        this.sendMeetingSignal(fromId, { type: "answer", sdp: pc.localDescription });
+      } else if (msg.type === "answer") {
+        await pc.setRemoteDescription(msg.sdp);
+        await this.flushMeetingCandidates(peer);
+      } else if (msg.type === "candidate") {
+        if (pc.remoteDescription) await pc.addIceCandidate(msg.candidate);
+        else peer.pendingCandidates.push(msg.candidate);
+      }
+    } catch (err) {
+      console.warn("Lỗi xử lý tín hiệu WebRTC:", err);
+    }
+  },
+
+  async flushMeetingCandidates(peer) {
+    const list = peer.pendingCandidates.splice(0);
+    for (const c of list) {
+      try { await peer.pc.addIceCandidate(c); } catch (e) { console.warn("ICE candidate lỗi:", e); }
+    }
+  },
+
+  sendMeetingSignal(targetId, data) {
+    if (this.meetingConn?.state !== "Connected") return;
+    this.meetingConn.invoke("Signal", targetId, JSON.stringify(data)).catch(err => console.warn("Gửi tín hiệu lỗi:", err));
+  },
+
+  removeMeetingPeer(connId) {
+    const peer = this.meetingPeers?.get(connId);
+    if (peer) {
+      try { peer.pc.close(); } catch { }
+      this.meetingPeers.delete(connId);
+    }
+    document.getElementById(`vbox-${connId}`)?.remove();
+    this.updateMeetingPeopleCount();
+  },
+
+  renderMeetingTile(id, info, isLocal) {
+    const grid = document.getElementById("meetingVideoGrid");
+    if (!grid || document.getElementById(`vbox-${id}`)) return;
+    const name = this.meetingEscape(info.name);
+    const tile = document.createElement("div");
+    tile.className = `tf-video-box ${isLocal ? "active-speaker" : ""} ${info.cam ? "" : "cam-off"}`;
+    tile.id = `vbox-${id}`;
+    tile.innerHTML = `
+      <video autoplay playsinline ${isLocal ? "muted" : ""} class="${isLocal && !this.screenSharing ? "tf-mirror" : ""}"></video>
+      <div class="tf-video-placeholder text-center text-white">
+        <span class="tf-avatar mb-2" style="background-color: ${this.meetingEscape(info.color)}; width: 64px; height: 64px; font-size: 1.5rem;">${this.meetingEscape(info.avatar)}</span>
+        <div class="fw-bold" style="font-size: 0.9rem;">${name}</div>
+      </div>
+      <div class="tf-video-status">
+        <span class="badge bg-warning text-dark tf-conn-badge ${isLocal ? "d-none" : ""}">Đang kết nối...</span>
+        <span class="badge bg-danger tf-mic-badge ${info.mic ? "d-none" : ""}">Mic tắt</span>
+      </div>
+      <div class="tf-video-name">${name}</div>
+    `;
+    grid.appendChild(tile);
+  },
+
+  attachMeetingStream(id, stream) {
+    const video = document.querySelector(`#vbox-${id} video`);
+    if (!video) return;
+    video.srcObject = stream;
+    video.play().catch(() => { });
+  },
+
+  updateMeetingTileState(id, mic, cam) {
+    const tile = document.getElementById(`vbox-${id}`);
+    if (!tile) return;
+    tile.classList.toggle("cam-off", !cam);
+    tile.querySelector(".tf-mic-badge")?.classList.toggle("d-none", !!mic);
+  },
+
+  updateMeetingPeopleCount() {
+    const el = document.getElementById("meetingPeopleCount");
+    if (el) el.textContent = (this.meetingPeers?.size || 0) + 1;
+  },
+
+  setMeetingStatus(text, cls) {
+    const el = document.getElementById("meetingConnStatus");
+    if (!el) return;
+    el.textContent = text;
+    el.className = cls || "";
+  },
+
+  updateMeetingControls() {
+    document.getElementById("btnToggleMic")?.classList.toggle("btn-danger-room", !this.micOn);
+    document.getElementById("btnToggleCamera")?.classList.toggle("btn-danger-room", !this.cameraOn);
+    document.getElementById("btnToggleScreen")?.classList.toggle("active-control", this.screenSharing);
+    const localVideo = document.querySelector("#vbox-local video");
+    if (localVideo) localVideo.classList.toggle("tf-mirror", !this.screenSharing);
+    this.updateMeetingTileState("local", this.micOn, this.cameraOn || this.screenSharing);
+    if (this.meetingConn?.state === "Connected") {
+      this.meetingConn.invoke("UpdateState", this.micOn, this.cameraOn || this.screenSharing).catch(() => { });
+    }
+  },
+
+  replaceOutgoingVideo(track) {
+    this.meetingPeers?.forEach(peer => {
+      const sender = peer.pc.getSenders().find(s => s.track && s.track.kind === "video");
+      if (sender) sender.replaceTrack(track).catch(err => console.warn("replaceTrack lỗi:", err));
+    });
+    this.attachMeetingStream("local", new MediaStream([track]));
   },
 
   toggleMic() {
-    this.micOn = !this.micOn;
-    const btn = document.getElementById("btnToggleMic");
-    if (btn) {
-      btn.innerHTML = this.micOn ? "Mic (Bật)" : "Mic (Tắt)";
-      btn.classList.toggle("btn-danger-room", !this.micOn);
+    if (!this.inMeeting) return;
+    if (!this.audioTrack) {
+      this.showToast("Không có micro hoặc chưa được cấp quyền micro.", "warning");
+      return;
     }
+    this.micOn = !this.micOn;
+    this.audioTrack.enabled = this.micOn;
+    this.updateMeetingControls();
     this.showToast(this.micOn ? "Đã bật micro" : "Đã tắt micro", "info");
   },
 
   toggleCamera() {
-    this.cameraOn = !this.cameraOn;
-    const btn = document.getElementById("btnToggleCamera");
-    if (btn) {
-      btn.innerHTML = this.cameraOn ? "Cam (Bật)" : "Cam (Tắt)";
-      btn.classList.toggle("btn-danger-room", !this.cameraOn);
+    if (!this.inMeeting) return;
+    if (!this.cameraTrack) {
+      this.showToast("Không có camera hoặc chưa được cấp quyền camera.", "warning");
+      return;
     }
+    this.cameraOn = !this.cameraOn;
+    this.cameraTrack.enabled = this.cameraOn;
+    this.updateMeetingControls();
     this.showToast(this.cameraOn ? "Đã bật camera" : "Đã tắt camera", "info");
   },
 
-  toggleScreenShare() {
-    this.screenSharing = !this.screenSharing;
-    const btn = document.getElementById("btnToggleScreen");
-    if (btn) btn.classList.toggle("active-control", this.screenSharing);
-    this.showToast(this.screenSharing ? "Đang chia sẻ màn hình..." : "Đã dừng chia sẻ", "info");
+  async toggleScreenShare() {
+    if (!this.inMeeting) return;
+    if (this.screenSharing) {
+      this.stopScreenShare();
+      return;
+    }
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      this.showToast("Trình duyệt không hỗ trợ chia sẻ màn hình.", "warning");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      this.screenTrack = stream.getVideoTracks()[0];
+      this.screenTrack.onended = () => this.stopScreenShare();
+      this.screenSharing = true;
+      this.replaceOutgoingVideo(this.screenTrack);
+      this.updateMeetingControls();
+      this.showToast("Đang chia sẻ màn hình...", "info");
+    } catch (err) {
+      console.warn("Hủy chia sẻ màn hình:", err);
+    }
   },
 
-  leaveMeeting() {
+  stopScreenShare() {
+    if (!this.screenTrack) return;
+    this.screenTrack.onended = null;
+    this.screenTrack.stop();
+    this.screenTrack = null;
+    this.screenSharing = false;
+    this.replaceOutgoingVideo(this.getOutgoingVideoTrack());
+    this.updateMeetingControls();
+    this.showToast("Đã dừng chia sẻ màn hình", "info");
+  },
+
+  async leaveMeeting(silent = false) {
     if (this.meetingTimer) clearInterval(this.meetingTimer);
+    const wasInMeeting = this.inMeeting;
     this.inMeeting = false;
+
+    this.meetingPeers?.forEach((_, id) => this.removeMeetingPeer(id));
+    this.meetingPeers = new Map();
+
+    if (this.screenTrack) { this.screenTrack.onended = null; this.screenTrack.stop(); this.screenTrack = null; }
+    this.screenSharing = false;
+    this.audioTrack?.stop();
+    this.cameraTrack?.stop();
+    this.audioTrack = null;
+    this.cameraTrack = null;
+
+    const conn = this.meetingConn;
+    this.meetingConn = null;
+    if (conn) {
+      try {
+        if (conn.state === "Connected") await conn.invoke("LeaveRoom");
+      } catch { }
+      conn.stop().catch(() => { });
+    }
+
+    const grid = document.getElementById("meetingVideoGrid");
+    if (grid) grid.innerHTML = "";
+
     const modalEl = document.getElementById("virtualMeetingModal");
     const modal = bootstrap.Modal.getInstance(modalEl);
-    if (modal) modal.hide();
-    this.showToast("Đã rời phòng họp.", "info");
+    if (modal && modalEl.classList.contains("show")) modal.hide();
+    if (wasInMeeting && !silent) this.showToast("Đã rời phòng họp.", "info");
+  },
+
+  appendMeetingChat(name, text, isBot = false) {
+    const chatBox = document.getElementById("meetingChatMessages");
+    if (!chatBox) return;
+    const isMe = !isBot && name === (this.currentUser?.name || "Thành viên");
+    const bubble = document.createElement("div");
+    bubble.className = isBot
+      ? "mb-2 p-2 rounded bg-dark small"
+      : `mb-2 p-2 rounded small ${isMe ? "bg-primary-subtle text-primary-emphasis" : "bg-light text-dark"}`;
+    bubble.innerHTML = `<strong class="${isBot ? "text-info" : ""}">${this.meetingEscape(name)}:</strong> ${this.meetingEscape(text)}`;
+    chatBox.appendChild(bubble);
+    chatBox.scrollTop = chatBox.scrollHeight;
   },
 
   sendMeetingChat() {
     const input = document.getElementById("meetingChatInput");
     const msg = input?.value.trim();
     if (!msg) return;
-
-    const chatBox = document.getElementById("meetingChatMessages");
-    if (chatBox) {
-      const bubble = document.createElement("div");
-      bubble.className = "mb-2 p-2 rounded bg-primary-subtle text-primary-emphasis small";
-      bubble.innerHTML = `<strong>${this.currentUser.name}:</strong> ${msg}`;
-      chatBox.appendChild(bubble);
-      chatBox.scrollTop = chatBox.scrollHeight;
+    if (this.meetingConn?.state === "Connected") {
+      this.meetingConn.invoke("SendChat", msg).catch(err => {
+        console.warn("Gửi chat lỗi:", err);
+        this.showToast("Không gửi được tin nhắn.", "error");
+      });
+    } else {
+      this.showToast("Chưa kết nối phòng họp, tin nhắn chưa được gửi.", "warning");
+      return;
     }
     input.value = "";
   },
