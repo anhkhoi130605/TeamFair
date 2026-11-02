@@ -29,7 +29,7 @@
                 <span class="small text-muted fw-semibold ps-1">Link mời:</span>
                 <input type="text" id="shareUrlInput" class="form-control form-control-sm bg-white font-monospace" style="width: 220px;" readonly />
                 <button type="button" class="btn btn-sm btn-primary px-3 rounded-2 fw-semibold" onclick="copyShareUrl()">
-                    📋 Sao chép
+                    Sao chép
                 </button>
             </div>
 
@@ -58,7 +58,7 @@
     <!-- INSTRUCTIONS BANNER -->
     <div class="alert alert-light border shadow-sm py-2 px-3 mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
         <div class="small text-slate-700">
-            👉 <strong>Hướng dẫn:</strong> Nhập tên của bạn, sau đó <strong>nhấn và kéo chuột</strong> trên bảng bên trái để tô các khung giờ bạn rảnh. Bảng bên phải sẽ tự động hiển thị số người rảnh ở từng giờ.
+            <strong>Hướng dẫn:</strong> Nhập tên của bạn, sau đó <strong>nhấn và kéo chuột</strong> trên bảng bên trái để tô các khung giờ bạn rảnh. Bảng bên phải sẽ tự động hiển thị số người rảnh ở từng giờ.
         </div>
         <div id="saveStatusIndicator" class="small text-muted fst-italic">
             ✓ Đã lưu tự động
@@ -173,7 +173,7 @@
     <div class="modal-dialog modal-dialog-centered" style="max-width: 440px;">
         <div class="modal-content rounded-4 border-0 shadow">
             <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title fw-bold text-slate-900">👋 Đăng Nhập Điền Lịch Rảnh</h5>
+                <h5 class="modal-title fw-bold text-slate-900">Đăng Nhập Điền Lịch Rảnh</h5>
             </div>
             <div class="modal-body p-4">
                 <p class="text-muted small">
@@ -923,7 +923,7 @@
         if (!currentParticipant) return;
 
         const statusEl = document.getElementById('saveStatusIndicator');
-        statusEl.textContent = '⏳ Đang lưu...';
+        statusEl.textContent = 'Đang lưu...';
         statusEl.className = 'small text-warning fw-semibold';
 
         clearTimeout(saveTimeout);
@@ -945,12 +945,12 @@
                     // Refresh group data immediately
                     await loadEventData(true);
                 } else {
-                    statusEl.textContent = '⚠️ Lỗi khi lưu';
+                    statusEl.textContent = 'Lỗi khi lưu';
                     statusEl.className = 'small text-danger';
                 }
             } catch (err) {
                 console.error('Auto save error:', err);
-                statusEl.textContent = '⚠️ Lỗi kết nối';
+                statusEl.textContent = 'Lỗi kết nối';
                 statusEl.className = 'small text-danger';
             }
         }, 500);

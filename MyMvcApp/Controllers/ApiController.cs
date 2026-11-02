@@ -367,7 +367,7 @@ public class ApiController : ControllerBase
             _db.ActivityLogs.Add(new ActivityLog
             {
                 TeamId = team.Id,
-                Text = $"{leaderMember.Name} đã tạo nhóm '{team.Name}' (Mã nhóm: {joinCode}) và trở thành 👑 Nhóm Trưởng.",
+                Text = $"{leaderMember.Name} đã tạo nhóm '{team.Name}' (Mã nhóm: {joinCode}) và trở thành Nhóm Trưởng.",
                 Time = "Vừa xong",
                 Type = "team",
                 CreatedAt = DateTime.UtcNow
@@ -378,7 +378,7 @@ public class ApiController : ControllerBase
             return Ok(new
             {
                 success = true,
-                message = $"Tạo nhóm '{team.Name}' thành công! Bạn đã là 👑 Nhóm Trưởng.",
+                message = $"Tạo nhóm '{team.Name}' thành công! Bạn đã là Nhóm Trưởng.",
                 joinCode = team.JoinCode,
                 team = new
                 {

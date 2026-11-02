@@ -1113,7 +1113,7 @@ const TeamFairApp = {
     } else if (this.activeTab === "meeting") {
       container.innerHTML = `
         <button class="btn btn-sm btn-tf-primary text-white" onclick="TeamFairApp.enterVirtualMeeting('')">
-          <span>▶️ Mở phòng tức thì</span>
+          <span>Mở phòng tức thì</span>
         </button>
       `;
     } else if (this.activeTab === "reviews") {
@@ -1546,7 +1546,6 @@ const TeamFairApp = {
     if (!myTasks.length) {
       container.innerHTML = `
         <div class="p-5 text-center text-muted">
-          <div class="fs-1 mb-2">📋</div>
           <div class="fw-semibold text-slate-800">Bạn chưa có công việc nào cần làm.</div>
           <div class="small text-muted mt-1">Khi nhóm trưởng phân chia nhiệm vụ, công việc và hạn chót sẽ xuất hiện tại đây.</div>
         </div>
@@ -1568,13 +1567,13 @@ const TeamFairApp = {
         if (isDone) {
           deadlineBadge = `<span class="badge bg-success-subtle text-success border border-success-subtle">Hạn: ${formattedDate} (Đã nộp)</span>`;
         } else if (diffDays < 0) {
-          deadlineBadge = `<span class="badge bg-danger-subtle text-danger border border-danger-subtle fw-bold">⚠️ Quá hạn ${Math.abs(diffDays)} ngày (${formattedDate})</span>`;
+          deadlineBadge = `<span class="badge bg-danger-subtle text-danger border border-danger-subtle fw-bold">Quá hạn ${Math.abs(diffDays)} ngày (${formattedDate})</span>`;
         } else if (diffDays === 0) {
-          deadlineBadge = `<span class="badge bg-danger text-white fw-bold">🔥 Hạn chót: Hôm nay (${formattedDate})</span>`;
+          deadlineBadge = `<span class="badge bg-danger text-white fw-bold">Hạn chót: Hôm nay (${formattedDate})</span>`;
         } else if (diffDays <= 2) {
-          deadlineBadge = `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning fw-bold">⏳ Còn ${diffDays} ngày (${formattedDate})</span>`;
+          deadlineBadge = `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning fw-bold">Còn ${diffDays} ngày (${formattedDate})</span>`;
         } else {
-          deadlineBadge = `<span class="badge bg-light text-slate-700 border">📅 Hạn: ${formattedDate}</span>`;
+          deadlineBadge = `<span class="badge bg-light text-slate-700 border">Hạn: ${formattedDate}</span>`;
         }
       }
 
@@ -1622,7 +1621,7 @@ const TeamFairApp = {
                   </div>
                 ` : `
                   <button class="btn btn-sm btn-primary fw-bold px-3 py-1 shadow-sm" onclick="TeamFairApp.openSubmitTaskModal('${t.id}')">
-                    🚀 Nộp Bài / Gửi Minh Chứng
+                    Nộp Bài / Gửi Minh Chứng
                   </button>
                 `}
               </div>
@@ -2526,7 +2525,7 @@ const TeamFairApp = {
       } else {
         goldenBox.innerHTML = `
           <div class="alert alert-warning p-3 mb-0">
-            <strong>️ Chưa có khung giờ nào 100% thành viên cùng rảnh.</strong> Hãy bấm vào các ô trên để cập nhật giờ rảnh cá nhân!
+            <strong> Chưa có khung giờ nào 100% thành viên cùng rảnh.</strong> Hãy bấm vào các ô trên để cập nhật giờ rảnh cá nhân!
           </div>
         `;
       }
@@ -2918,7 +2917,7 @@ const TeamFairApp = {
     tile.className = `tf-video-box ${isLocal ? "active-speaker" : ""} ${info.cam ? "" : "cam-off"}`;
     tile.id = `vbox-${id}`;
     tile.innerHTML = `
-      <video autoplay playsinline ${isLocal ? "muted" : ""} class="${isLocal && !this.screenSharing ? "tf-mirror" : ""}"></video>
+      <video autoplay playsinline disablepictureinpicture ${isLocal ? "muted" : ""} class="${isLocal && !this.screenSharing ? "tf-mirror" : ""}"></video>
       <div class="tf-video-placeholder text-center text-white">
         <span class="tf-avatar mb-2" style="background-color: ${this.meetingEscape(info.color)}; width: 64px; height: 64px; font-size: 1.5rem;">${this.meetingEscape(info.avatar)}</span>
         <div class="fw-bold" style="font-size: 0.9rem;">${name}</div>
@@ -3713,7 +3712,7 @@ const TeamFairApp = {
     toastEl.innerHTML = `
       <div class="d-flex">
         <div class="toast-body fw-semibold">
-          ${type === 'success' ? '' : type === 'danger' ? '️' : 'ℹ️'} ${message}
+          ${message}
         </div>
         <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
       </div>

@@ -49,13 +49,13 @@
                         <li class="nav-item" role="presentation">
                             <button class="nav-link active rounded-pill px-3 py-2 fw-semibold" id="tab-specific-dates" 
                                     data-bs-toggle="pill" data-bs-target="#content-specific-dates" type="button" role="tab">
-                                📅 Ngày cụ thể trên lịch
+                                Ngày cụ thể trên lịch
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link rounded-pill px-3 py-2 fw-semibold" id="tab-days-of-week" 
                                     data-bs-toggle="pill" data-bs-target="#content-days-of-week" type="button" role="tab">
-                                🔄 Thứ trong tuần (Lịch định kỳ)
+                                Thứ trong tuần (Lịch định kỳ)
                             </button>
                         </li>
                     </ul>
@@ -81,7 +81,7 @@
                             </div>
 
                             <div class="mt-3 text-muted small">
-                                💡 <em>Nhấp chuột vào các ô ngày để chọn hoặc bỏ chọn. Có thể chọn nhiều ngày không liền kề.</em>
+                                <em>Nhấp chuột vào các ô ngày để chọn hoặc bỏ chọn. Có thể chọn nhiều ngày không liền kề.</em>
                             </div>
                         </div>
 
@@ -159,7 +159,7 @@
                 <!-- Submit Button -->
                 <div class="pt-3 border-top">
                     <button type="submit" id="btnSubmitCreate" class="btn btn-primary btn-lg rounded-pill px-5 shadow-sm w-100 w-md-auto fw-bold">
-                        🚀 Tạo Sự Kiện & Lấy Link Chia Sẻ
+                        Tạo Sự Kiện & Lấy Link Chia Sẻ
                     </button>
                 </div>
             </form>
@@ -172,7 +172,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content rounded-4 border-0 shadow">
             <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title fw-bold text-slate-900">🎉 Tạo Sự Kiện Thành Công!</h5>
+                <h5 class="modal-title fw-bold text-slate-900">Tạo Sự Kiện Thành Công!</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
@@ -182,7 +182,7 @@
                 <div class="input-group mb-3">
                     <input type="text" id="createdEventUrlInput" class="form-control rounded-start-3 font-monospace bg-light" readonly />
                     <button class="btn btn-primary px-3 rounded-end-3" type="button" onclick="copyCreatedLink()">
-                        📋 Sao chép
+                        Sao chép
                     </button>
                 </div>
                 <div id="copySuccessAlert" class="alert alert-success py-2 px-3 small d-none">
@@ -440,7 +440,7 @@
 
         const btnSubmit = document.getElementById('btnSubmitCreate');
         btnSubmit.disabled = true;
-        btnSubmit.innerHTML = '⏳ Đang tạo sự kiện...';
+        btnSubmit.innerHTML = 'Đang tạo sự kiện...';
 
         try {
             const res = await fetch('/api/events/create', {
@@ -471,7 +471,7 @@
             alert('Có lỗi xảy ra khi kết nối máy chủ.');
         } finally {
             btnSubmit.disabled = false;
-            btnSubmit.innerHTML = '🚀 Tạo Sự Kiện & Lấy Link Chia Sẻ';
+            btnSubmit.innerHTML = 'Tạo Sự Kiện & Lấy Link Chia Sẻ';
         }
     }
 
